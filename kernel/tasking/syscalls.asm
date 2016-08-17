@@ -38,7 +38,7 @@ syscall_init:
 ; In\	EBP = Function code
 ; In\	All other registers = Depends on function input
 ; Out\	All registers = Depends on function output; all undefined registers destroyed
-
+align 32
 kernel_api:
 	cmp ebp, MAXIMUM_FUNCTION
 	jg .done

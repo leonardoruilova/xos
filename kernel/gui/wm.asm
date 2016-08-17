@@ -55,16 +55,18 @@ WM_BUTTON			= 0x0008
 
 MAXIMUM_WINDOWS			= 16
 
+align 32
 open_windows			dd 0
 active_window			dd -1
 window_handles			dd 0
 wm_background			dd 0
+align 32
 wm_running			db 0
 
 ; Window Theme!
 ; TO-DO: Set these values from a theme file from the disk (i.e. make the gui costomizable)
-align 16
-wm_color			dd 0x303030
+align 32
+wm_color			dd 0x004288
 ;window_header			dd 0xE8A200
 window_header			dd 0x00A2E8
 window_inactive_header		dd 0x222222
@@ -156,7 +158,7 @@ wm_find_handle:
 ; Out\	DX = Flags
 ; Out\	ECX = Framebuffer
 ; Out\	EBP = Title text
-
+align 32
 wm_get_window:
 	cmp eax, MAXIMUM_WINDOWS
 	jge .no
@@ -180,6 +182,7 @@ wm_get_window:
 	clc
 	ret
 
+align 32
 .no:
 	stc
 	ret
@@ -253,7 +256,7 @@ wm_make_handle:
 ; In\	DX = Flags
 ; In\	ECX = Title text
 ; Out\	EAX = Window handle, -1 on error
-
+align 32
 wm_create_window:
 	cmp [open_windows], MAXIMUM_WINDOWS
 	jge .no
@@ -344,13 +347,15 @@ wm_create_window:
 ; Detects which window the mouse is on
 ; In\	Nothing
 ; Out\	EAX = Window handle, -1 on error
-
+align 32
 wm_detect_window:
 	cmp [open_windows], 0
 	je .no
 
 	mov [.handle], MAXIMUM_WINDOWS-1
+	jmp .loop
 
+align 32
 .loop:
 	cmp [.handle], -1
 	je .no
@@ -384,10 +389,12 @@ wm_detect_window:
 	mov eax, [.handle]
 	ret
 
+align 32
 .next:
 	dec [.handle]
 	jmp .loop
 
+align 32
 .no:
 	mov eax, -1
 	ret
@@ -402,7 +409,7 @@ wm_detect_window:
 ; Checks if the mouse is on the surface of a window
 ; In\	EAX = Window handle
 ; Out\	EAX = 1 if mouse is on surface of window
-
+align 32
 wm_is_mouse_on_window:
 	call wm_get_window
 	jc .no
@@ -431,10 +438,12 @@ wm_is_mouse_on_window:
 	mov eax, 1
 	ret
 
+align 32
 .no:
 	xor eax, eax	; mov eax, 0
 	ret
 
+align 32
 .x			dw 0
 .y			dw 0
 .max_x			dw 0
@@ -442,13 +451,14 @@ wm_is_mouse_on_window:
 
 ; wm_redraw:
 ; Redraws all windows
-
+align 32
 wm_redraw:
 	; lock the screen to improve performance!
 	call use_back_buffer
 	call lock_screen
 
-	call desktop_redraw
+	mov ebx, [wm_color]
+	call clear_screen
 
 	; now move on to the windows
 	xor eax, eax
@@ -460,6 +470,9 @@ wm_redraw:
 	mov ecx, [window_inactive_title]
 	call set_text_color
 
+	jmp .loop
+
+align 32
 .loop:
 	cmp [.handle], MAXIMUM_WINDOWS
 	jge .do_active_window
@@ -524,10 +537,14 @@ wm_redraw:
 	mov edx, [.framebuffer]
 	call blit_buffer_no_transparent
 
+	jmp .next
+
+align 32
 .next:
 	inc [.handle]
 	jmp .loop
 
+align 32
 .do_active_window:
 	cmp [active_window], -1
 	je .done
@@ -590,7 +607,9 @@ wm_redraw:
 	add bx, 24
 	mov edx, [.framebuffer]
 	call blit_buffer_no_transparent
+	jmp .done
 
+align 32
 .done:
 	call redraw_mouse	; this takes care of all the dirty work before actually drawing the cursor ;)
 	ret
@@ -605,12 +624,12 @@ wm_redraw:
 
 ; wm_event:
 ; WM Event Handler
-
+align 32
 wm_event:
-	cli		; sensitive area!
+	;cli		; sensitive area!
 
-	test [wm_running], 1
-	jz .no_wm
+	cmp [wm_running], 0
+	je .no_wm
 
 	;test [mouse_data], MOUSE_LEFT_BTN	; left click event
 	;jz .done
@@ -620,6 +639,9 @@ wm_event:
 	test [mouse_old_data], MOUSE_LEFT_BTN
 	jnz .drag
 
+	jmp .click
+
+align 32
 .click:
 	; now we know the user just clicked on something
 	; if he clicked on the active window, send the window a click event
@@ -639,33 +661,24 @@ wm_event:
 	shl eax, 7
 	add eax, [window_handles]
 
-	mov ecx, [mouse_y]
-	mov dx, [eax+WINDOW_Y]
-	add dx, 24
-	cmp cx, dx
-	jl .check_taskbar
+	;mov ecx, [mouse_y]
+	;mov dx, [eax+WINDOW_Y]
+	;add dx, 24
+	;cmp cx, dx
+	;jl .check_taskbar
 
 	or word[eax+WINDOW_EVENT], WM_LEFT_CLICK
 
 	jmp .done
 
+align 32
 .set_focus:
 	call wm_detect_window
 	mov [active_window], eax
-	cmp eax, -1
-	je .check_taskbar
-	jmp .click
+	jmp .done
 	;jmp .done
 
-.check_taskbar:
-	cmp [mouse_y], 32
-	jl .desktop_event
-	jmp .done
-
-.desktop_event:
-	call desktop_event
-	jmp .done
-
+align 32
 .drag:
 	; if the user dragged something --
 	; -- we'll need to know if a window has been dragged --
@@ -691,7 +704,9 @@ wm_event:
 	mov edx, [mouse_old_y]
 	mov eax, [mouse_x]
 	mov ebx, [mouse_y]
+	jmp .do_x
 
+align 32
 .do_x:
 	sub ax, cx
 	js .x_negative
@@ -718,6 +733,7 @@ wm_event:
 .x_zero:
 	mov word[esi+WINDOW_X], 0
 
+align 32
 .do_y:
 	sub bx, dx
 	js .y_negative
@@ -743,7 +759,9 @@ wm_event:
 
 .y_zero:
 	mov word[esi+WINDOW_Y], 0
+	jmp .done
 
+align 32
 .done:
 	call wm_redraw
 	ret
@@ -758,7 +776,7 @@ wm_event:
 ; Reads the WM event
 ; In\	EAX = Window handle
 ; Out\	AX = Bitfield of WM event data; I'll document this somewhere
-
+align 32
 wm_read_event:
 	cmp eax, MAXIMUM_WINDOWS
 	jge .no

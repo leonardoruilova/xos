@@ -133,23 +133,23 @@ acpi_find_table:
 	je .no
 
 	mov [.sig], eax
-	mov [.current_table], 0
 
 	mov esi, [acpi_rsdt]
+	mov eax, [esi+4]	; size
+	add eax, esi
+	mov [.end_rsdt], eax
+
 	add esi, ACPI_SDT_SIZE
 
 .loop:
-	mov ecx, [acpi_tables]
-	cmp [.current_table], ecx
-	jg .no
-
-	mov eax, [esi]		; table address
+	mov eax, [esi]		; table addr
 	mov edx, [.sig]
 	cmp [eax], edx
 	je .found
 
-	inc [.current_table]
 	add esi, 4
+	cmp esi, [.end_rsdt]
+	jg .no
 	jmp .loop
 
 .found:
@@ -160,8 +160,7 @@ acpi_find_table:
 	ret
 
 .sig			dd 0
-.current_table		dd 0
-.table			dd 0
+.end_rsdt		dd 0
 
 ; enable_acpi:
 ; Enables ACPI hardware mode
@@ -186,7 +185,7 @@ enable_acpi:
 	call install_isr
 
 	mov ax, [acpi_fadt.sci_interrupt]
-	call pic_unmask
+	call irq_unmask
 
 	; check if ACPI is enabled
 	mov edx, [acpi_fadt.pm1a_control_block]

@@ -101,106 +101,20 @@ memxchg:
 .tmp				dd 0
 
 ; memcpy:
-; Fast SSE memcpy
+; Like name says
 ; In\	ESI = Source
 ; In\	EDI = Destination
 ; In\	ECX = Byte count
 ; Out\	Nothing
-
+align 32
 memcpy:
-	test esi, 0xF
-	jnz memcpy_u
-
-	test edi, 0xF
-	jnz memcpy_u
-
-	cmp ecx, 128
-	jl .just_bytes
-
 	push ecx
-	shr ecx, 7	; div 128
-
-.loop:
-	movdqa xmm0, [esi]
-	movdqa xmm1, [esi+0x10]
-	movdqa xmm2, [esi+0x20]
-	movdqa xmm3, [esi+0x30]
-	movdqa xmm4, [esi+0x40]
-	movdqa xmm5, [esi+0x50]
-	movdqa xmm6, [esi+0x60]
-	movdqa xmm7, [esi+0x70]
-
-	movdqa [edi], xmm0
-	movdqa [edi+0x10], xmm1
-	movdqa [edi+0x20], xmm2
-	movdqa [edi+0x30], xmm3
-	movdqa [edi+0x40], xmm4
-	movdqa [edi+0x50], xmm5
-	movdqa [edi+0x60], xmm6
-	movdqa [edi+0x70], xmm7
-
-	add esi, 128
-	add edi, 128
-	loop .loop
-
-	pop ecx
-
-.just_bytes:
-	push ecx
-
-	and ecx, 0x7F
 	shr ecx, 2	; div 4
 	rep movsd
 
 	pop ecx
 	and ecx, 3
 	rep movsb
-
-	ret
-
-memcpy_u:
-	cmp ecx, 128
-	jl .just_bytes
-
-	push ecx
-	shr ecx, 7	; div 128
-
-.loop:
-	movdqu xmm0, [esi]
-	movdqu xmm1, [esi+0x10]
-	movdqu xmm2, [esi+0x20]
-	movdqu xmm3, [esi+0x30]
-	movdqu xmm4, [esi+0x40]
-	movdqu xmm5, [esi+0x50]
-	movdqu xmm6, [esi+0x60]
-	movdqu xmm7, [esi+0x70]
-
-	movdqu [edi], xmm0
-	movdqu [edi+0x10], xmm1
-	movdqu [edi+0x20], xmm2
-	movdqu [edi+0x30], xmm3
-	movdqu [edi+0x40], xmm4
-	movdqu [edi+0x50], xmm5
-	movdqu [edi+0x60], xmm6
-	movdqu [edi+0x70], xmm7
-
-	add esi, 128
-	add edi, 128
-	loop .loop
-
-	pop ecx
-
-.just_bytes:
-	push ecx
-
-	and ecx, 0x7F
-	shr ecx, 2	; div 4
-	rep movsd
-
-	pop ecx
-	and ecx, 3
-	rep movsb
-
 	ret
 
 

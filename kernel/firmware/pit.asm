@@ -4,7 +4,7 @@
 
 use32
 
-TIMER_FREQUENCY			= 1000
+TIMER_FREQUENCY			= 100			; 100 Hz is way more than enough
 MAXIMUM_TASK_TIME		= TIMER_FREQUENCY / 10
 
 timer_ticks			dd 0
@@ -37,7 +37,7 @@ pit_init:
 
 	; unmask IRQ
 	mov al, 0
-	call pic_unmask
+	call irq_unmask
 
 	ret
 

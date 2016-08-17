@@ -158,10 +158,12 @@ com1_send:
 ; Out\	Nothing
 
 kprint:
+	pusha
 	cmp [com1_last_byte], 10
 	je .timestamp
 
 	call com1_send
+	popa
 	ret
 
 .timestamp:
@@ -180,6 +182,7 @@ kprint:
 
 	pop esi
 	call com1_send
+	popa
 	ret
 
 

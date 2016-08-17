@@ -52,10 +52,12 @@ TASK_STACK		= 65536		; 64 KB
 ; Load Address of a Task
 TASK_LOAD_ADDR		= 0x8000000	; 128 MB
 
-MAXIMUM_TASKS		= 32	; probably expand this in the future?
+MAXIMUM_TASKS		= 32		; probably expand this in the future?
 
+align 2
 running_tasks		dw 0
 current_task		dw 0
+align 8
 task_structure		dd 0
 idle_time		dd 0
 nonidle_time		dd 0
@@ -171,7 +173,7 @@ create_task_memory:
 
 ; yield:
 ; Gives control to the next task
-
+align 32
 yield:
 	cli		; sensitive area of code! ;)
 

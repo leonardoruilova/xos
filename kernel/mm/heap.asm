@@ -61,7 +61,7 @@ kmalloc:
 
 kfree:
 	mov ecx, [eax-16]
-	sub ecx, 16
+	;sub ecx, 16
 	call vmm_free
 	ret
 
@@ -106,7 +106,7 @@ malloc:
 
 free:
 	mov ecx, [eax-16]
-	sub ecx, 16
+	;sub ecx, 16
 	call vmm_free
 	ret
 

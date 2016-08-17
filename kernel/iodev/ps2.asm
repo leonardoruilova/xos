@@ -14,6 +14,7 @@ PS2_KBD_DISABLE			= 0xF5
 
 ; PS/2 Mouse Commands
 PS2_MOUSE_COMMAND		= 0xD4
+PS2_MOUSE_DEFAULTS		= 0xF6
 PS2_MOUSE_ENABLE_AUX		= 0xA8
 PS2_MOUSE_DISABLE_AUX		= 0xA9
 PS2_MOUSE_GET_ID		= 0xF2
@@ -50,7 +51,9 @@ mouse_old_y			dd 0
 mouse_initial_x			dd 0
 mouse_initial_y			dd 0
 
+align 32
 mouse_x_max			dd 0
+align 32
 mouse_y_max			dd 0
 
 align 16
@@ -62,10 +65,14 @@ mouse_height			dd 0
 align 16
 mouse_visible			db 0
 
+align 32
 mouse_packet:
 	.data			db 0
+	align 32
 	.x			db 0
+	align 32
 	.y			db 0
+	align 32
 mouse_irq_state			db 0
 
 ; wait_ps2_write:
@@ -183,7 +190,7 @@ ps2_kbd_init:
 
 	; unmask the PIC IRQ
 	mov al, 1
-	call pic_unmask
+	call irq_unmask
 	ret
 
 ; ps2_kbd_irq:
@@ -235,7 +242,7 @@ ps2_mouse_init:
 	call iowait
 	call iowait
 	mov al, 1
-	call pic_mask
+	call irq_mask
 
 	; enable auxiliary mouse device
 	call wait_ps2_write
@@ -292,30 +299,36 @@ ps2_mouse_init:
 	cmp al, 0xFA
 	jne .no_mouse
 
+	; set default values
+	mov al, PS2_MOUSE_DEFAULTS
+	call ps2_mouse_send
+	cmp al, 0xFA
+	jne .no_mouse
+
 	; set resolution
-	mov al, PS2_MOUSE_SET_RESOLUTION
-	call ps2_mouse_send
-	mov al, 0
-	call ps2_mouse_send
+	;mov al, PS2_MOUSE_SET_RESOLUTION
+	;call ps2_mouse_send
+	;mov al, 0
+	;call ps2_mouse_send
 
 	; set packets per second
-	mov al, PS2_MOUSE_SET_SPEED
-	call ps2_mouse_send
-	mov al, 200
-	call ps2_mouse_send
+	;mov al, PS2_MOUSE_SET_SPEED
+	;call ps2_mouse_send
+	;mov al, 200
+	;call ps2_mouse_send
 
 	; some mice don't support 200 packets/second
 	; on those mice, use the default rate 100 packets
-	cmp al, 0xFA
-	je .after
+	;cmp al, 0xFA
+	;je .after
 
-	mov esi, .100_msg
-	call kprint
+	;mov esi, .100_msg
+	;call kprint
 
-	mov al, PS2_MOUSE_SET_SPEED
-	call ps2_mouse_send
-	mov al, 100
-	call ps2_mouse_send
+	;mov al, PS2_MOUSE_SET_SPEED
+	;call ps2_mouse_send
+	;mov al, 100
+	;call ps2_mouse_send
 
 .after:
 	; enable packets
@@ -370,11 +383,11 @@ ps2_mouse_init:
 
 	; unmask the mouse irq
 	mov al, 12
-	call pic_unmask
+	call irq_unmask
 
 	; and keyboard irq also
 	mov al, 1
-	call pic_unmask
+	call irq_unmask
 
 	ret
 
@@ -387,7 +400,7 @@ ps2_mouse_init:
 
 ; ps2_mouse_irq:
 ; PS/2 Mouse IRQ Handler
-
+align 32
 ps2_mouse_irq:
 	pusha
 
@@ -402,26 +415,32 @@ ps2_mouse_irq:
 	or dl, dl
 	jz .data
 
-	test dl, 1
-	jnz .x
+	cmp dl, 1
+	je .x
 
-	test dl, 2
-	jnz .y
+	cmp dl, 2
+	je .y
 
 	xor dl, dl
 	mov [mouse_irq_state], dl
 	jmp .done
 
+align 32
 .data:
+	;test al, MOUSE_X_OVERFLOW OR MOUSE_Y_OVERFLOW
+	;jnz .done
+
 	mov [mouse_packet.data], al
 	inc [mouse_irq_state]
 	jmp .done
 
+align 32
 .x:
 	mov [mouse_packet.x], al
 	inc [mouse_irq_state]
 	jmp .done
 
+align 32
 .y:
 	mov [mouse_packet.y], al
 	xor dl, dl
@@ -434,9 +453,12 @@ ps2_mouse_irq:
 	call wm_event
 	jmp .done
 
+align 32
 .redraw:
 	call redraw_mouse
+	jmp .done
 
+align 32
 .done:
 	mov al, 0x20
 	out 0xa0, al
@@ -446,15 +468,17 @@ ps2_mouse_irq:
 
 ; update_mouse:
 ; Updates the mouse position
-
+align 32
 update_mouse:
 	; if the mouse data doesn't have proper alignment, ignore the packet
-	test [mouse_packet.data], 8
-	jz .quit
+	;test [mouse_packet.data], 8
+	;jz .quit
 
 	; if the overflow bits are set, ignore the packet
-	test [mouse_packet.data], MOUSE_X_OVERFLOW OR MOUSE_Y_OVERFLOW
-	jnz .quit
+	;test [mouse_packet.data], MOUSE_X_OVERFLOW
+	;jnz .quit
+	;test [mouse_packet.data], MOUSE_Y_OVERFLOW
+	;jnz .quit
 
 	; save the old mouse state before determining its new state
 	mov eax, [mouse_data]
@@ -534,7 +558,7 @@ update_mouse:
 
 ; show_mouse:
 ; Shows the mouse cursor
-
+align 32
 show_mouse:
 	mov [mouse_visible], 1
 	call redraw_mouse
@@ -542,7 +566,7 @@ show_mouse:
 
 ; hide_mouse:
 ; Hides the mouse cursor
-
+align 32
 hide_mouse:
 	mov [mouse_visible], 0
 	call redraw_screen	; redraw screen objects to hide mouse ;)
@@ -550,7 +574,7 @@ hide_mouse:
 
 ; redraw_mouse:
 ; Redraws the mouse
-
+align 32
 redraw_mouse:
 	test [mouse_visible], 1
 	jz .only_screen
@@ -593,6 +617,7 @@ redraw_mouse:
 	;call unlock_screen
 	ret
 
+align 32
 .only_screen:
 	call use_back_buffer
 	call unlock_screen

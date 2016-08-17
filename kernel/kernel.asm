@@ -186,23 +186,23 @@ kmain32:
 	call syscall_init
 	call tasking_init
 	call acpi_init
+	;call apic_init
 	call pci_init
 	call blkdev_init
+	;call xfs_detect
 	call wm_init
 	call use_back_buffer
 	call unlock_screen
 
-	; to demonstrate multitasking...
+	; for testing
 	mov edx, task1
-	call create_task_memory
-	mov edx, task2
 	call create_task_memory
 
 ; idle_process:
 ; The only process on the system which runs in ring 0
 ; All it does is keep the CPU halted until it's time for a task switch or IRQ
 ; This cools down the CPU and is needed on overclocked laptops to prevent overheating
-
+align 32
 idle_process:
 	sti
 	hlt
@@ -210,166 +210,20 @@ idle_process:
 
 task1:
 	mov ebp, 0
-	mov ax, 48
-	mov bx, 48
-	mov si, 360
-	mov di, 256
+	xor ax, ax
+	xor bx, bx
+	mov si, 128
+	mov di, 128
 	mov dx, 0
 	mov ecx, .title
 	int 0x60
 
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16
-	mov dx, 16
-	mov esi, .text
-	mov ebx, 0x000000
-	int 0x60
-
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16
-	mov dx, 32
-	mov esi, .total
-	mov ebx, 0
-	int 0x60
-
-	mov eax, [idle_time]
-	add eax, [nonidle_time]
-	call int_to_string
-
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16+(.total_len * 8)
-	mov dx, 32
-	mov ebx, 0
-	int 0x60
-
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16
-	mov dx, 48
-	mov esi, .nonidle
-	mov ebx, 0
-	int 0x60
-
-	mov eax, [nonidle_time]
-	call int_to_string
-
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16+(.nonidle_len * 8)
-	mov dx, 48
-	mov ebx, 0
-	int 0x60
-
-.wait:
-	; read window event
-	mov ebp, 4
-	mov eax, 0
-	int 0x60
-
-	test ax, WM_LEFT_CLICK
-	jnz .clicked
-
+.yield:
 	mov ebp, 1
 	int 0x60
-	jmp .wait
-
-.clicked:
-	mov ebp, 8
-	mov eax, 0
-	mov ebx, 0xD8D8D8
-	int 0x60
-
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16
-	mov dx, 16
-	mov esi, .text
-	mov ebx, 0x000000
-	int 0x60
-
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16
-	mov dx, 32
-	mov esi, .total
-	mov ebx, 0
-	int 0x60
-
-	mov eax, [idle_time]
-	add eax, [nonidle_time]
-	call int_to_string
-
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16+(.total_len * 8)
-	mov dx, 32
-	mov ebx, 0
-	int 0x60
-
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16
-	mov dx, 48
-	mov esi, .nonidle
-	mov ebx, 0
-	int 0x60
-
-	mov eax, [nonidle_time]
-	call int_to_string
-
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16+(.nonidle_len * 8)
-	mov dx, 48
-	mov ebx, 0
-	int 0x60
-
-	jmp .wait
-
-.title			db "CPU Usage",0
-.text			db "Click this window to refresh CPU usage. ",0
-.total			db "Total time: ",0
-.total_len		= $ - .total - 1
-.nonidle		db "Non-idle time: ",0
-.nonidle_len		= $ - .nonidle - 1
-.clicks			dd 0
-
-task2:
-	mov ebp, 0
-	mov ax, 430
-	mov bx, 200
-	mov si, 256
-	mov di, 256
-	mov dx, 0
-	mov ecx, .title
-	int 0x60
-
-	mov ebp, 7
-	mov eax, 1
-	mov esi, .text
-	mov cx, 8
-	mov dx, 16
-	mov ebx, 0
-	int 0x60
-
-.hang:
-	mov ebp, 1
-	int 0x60
-	jmp .hang
+	jmp .yield
 
 .title			db "Test Window",0
-.text			db "Thanks for trying xOS!",10
-			db "There's not much to see now..",10
-			db "But if you want to see an ACPI",10
-			db "shutdown, click OFF on the top",10
-			db "left corner.",10
-			db "Please send me your feedback: ",10
-			db " omarx024@gmail.com.",0
-.text_len		= $ - .text - 1
-.clicks			dd 0
 
 
 	;
@@ -384,6 +238,7 @@ task2:
 	include "kernel/x86/early.asm"		; early routines that depends on bios
 	include "kernel/x86/modes.asm"		; TSS, GDT, IDT
 	include "kernel/x86/pic.asm"		; PIC driver
+	include "kernel/x86/apic.asm"		; APIC driver
 
 	; Firmware
 	include "kernel/firmware/vbe.asm"	; VBE 2.0 driver
@@ -413,13 +268,17 @@ task2:
 
 	; Graphics
 	include "kernel/gui/gdi.asm"		; Graphics library
-	include "kernel/gui/desktop.asm"	; Desktop
+	;include "kernel/gui/desktop.asm"	; Desktop
 	include "kernel/gui/wm.asm"		; Window manager
 	include "kernel/gui/canvas.asm"		; Window canvas functions
 
 	; Multitasking Stuff
 	include "kernel/tasking/tasking.asm"	; Main scheduler code
 	include "kernel/tasking/syscalls.asm"	; System calls table and handler
+
+	; Filesystem
+	include "kernel/fs/xfs.asm"		; xFS
+	;include "kernel/fs/iso9660.asm"	; ISO9660 will be here someday
 
 	; Default mouse cursor
 	cursor:
@@ -430,6 +289,8 @@ task2:
 	; Default bitmap font
 	font:
 	file "kernel/fonts/alotware.bin"
+	;file "kernel/fonts/cp437.bin"
+	;include "kernel/fonts/glaux-mono.asm"
 
 
 

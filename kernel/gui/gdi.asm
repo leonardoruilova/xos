@@ -7,26 +7,32 @@ use32
 ; xOS GDI -- An internal graphics library used by the xOS Kernel
 ; Should be easy to port to other systems
 
+align 16
 is_redraw_enabled		db 1
+align 32
 text_background			dd 0x000000
+align 32
 text_foreground			dd 0xFFFFFF
+align 32
 system_font			dd font
 current_buffer			db 0		; 0 if the system is using the back buffer
 						; 1 if it's using the hardware buffer
 
 ; redraw_screen:
 ; Redraws the screen
-
+align 32
 redraw_screen:
-	test [is_redraw_enabled], 1
-	jz .quit
-	test [current_buffer], 1
-	jnz .quit
+	cmp [is_redraw_enabled], 1
+	jne .quit
+	cmp [current_buffer], 1
+	je .quit
 
 	mov esi, VBE_BACK_BUFFER
 	mov edi, VBE_PHYSICAL_BUFFER
 	mov ecx, [screen.screen_size_dqwords]
+	jmp .loop
 
+align 32
 .loop:
 	movdqa xmm0, [esi]
 	movdqa xmm1, [esi+0x10]
@@ -55,28 +61,28 @@ redraw_screen:
 
 ; use_back_buffer:
 ; Forces the system to use the back buffer
-
+align 32
 use_back_buffer:
 	mov [current_buffer], 0
 	ret
 
 ; use_front_buffer:
 ; Forces the system to use the hardware framebuffer
-
+align 32
 use_front_buffer:
 	mov [current_buffer], 1
 	ret
 
 ; lock_screen:
 ; Prevents screen redraws while using the back buffer
-
+align 32
 lock_screen:
 	mov [is_redraw_enabled], 0	
 	ret
 
 ; unlock_screen:
 ; Enables screen redraws while using the back buffer
-
+align 32
 unlock_screen:
 	mov [is_redraw_enabled], 1
 	ret
@@ -90,47 +96,62 @@ unlock_screen:
 ; If the system is using the hardware framebuffer (i.e. current_buffer is set to 1), ESI and EDI are swapped.
 ; This tricks the GDI into writing directly to the hardware framebuffer, and preventing manual screen redraws.
 ; This is needed for the mouse cursor. ;)
-
+align 32
 get_pixel_offset:
-	mov [.x], ax
-	mov [.y], bx
+	and eax, 0xFFFF
+	and ebx, 0xFFFF
 
-	movzx eax, [.y]
+	cmp [screen.bpp], 32
+	jne .24
+
+.32:
+	push eax	; x
+	mov ax, bx
 	mov ebx, [screen.bytes_per_line]
-	mul ebx
+	mul ebx		; y*pitch
 
-	push eax
-
-	movzx eax, [.x]
-	mov ebx, [screen.bytes_per_pixel]
-	mul ebx
-
-	pop ebx
+	pop ebx		; ebx=x
+	shl ebx, 2	; mul 4
 	add eax, ebx
 
 	mov esi, eax
 	mov edi, eax
-
 	add esi, VBE_PHYSICAL_BUFFER
 	add edi, VBE_BACK_BUFFER
 
-	test [current_buffer], 1
-	jnz .swap
+.done:
+	cmp [current_buffer], 1
+	je .swap
 	ret
+
+.24:
+	push eax	; x
+	mov ax, bx
+	mov ebx, [screen.bytes_per_line]
+	mul ebx		; y*pitch
+
+	pop ebx		; ebx=x
+	mov edx, ebx
+	add ebx, edx	; mul 2
+	add ebx, edx	; mul 3
+	add eax, ebx
+
+	mov esi, eax
+	mov edi, eax
+	add esi, VBE_PHYSICAL_BUFFER
+	add edi, VBE_BACK_BUFFER
+	jmp .done
 
 .swap:
 	xchg esi, edi	; swap ;)
 	ret
-
-.x			dw 0
-.y			dw 0
 
 ; put_pixel:
 ; Puts a pixel
 ; In\	AX/BX = X/Y pos
 ; In\	EDX = Color
 ; Out\	Nothing
-
+align 32
 put_pixel:
 	push edx
 	call get_pixel_offset
@@ -156,7 +177,7 @@ put_pixel:
 ; Clears the screen
 ; In\	EBX = Color
 ; Out\	Nothing
-
+align 32
 clear_screen:
 	mov [screen.x], 0
 	mov [screen.y], 0
@@ -178,6 +199,7 @@ clear_screen:
 	call redraw_screen
 	ret
 
+align 32
 .32:
 	mov edi, VBE_BACK_BUFFER
 	mov ecx, [screen.screen_size]
@@ -194,13 +216,14 @@ clear_screen:
 ; In\	CX/DX = X/Y pos
 ; In\	ESI = Font data
 ; Out\	Nothing
-
+align 32
 render_char:
 	cmp [screen.bpp], 32
 	je render_char32
 
 	jmp render_char24
 
+align 32
 render_char32:
 	and eax, 0xFF
 	shl eax, 4
@@ -262,10 +285,12 @@ render_char32:
 .done:
 	ret
 
+align 32
 .font_data			dd 0
 .row				db 0
 .column				db 0
 
+align 32
 render_char24:
 	and eax, 0xFF
 	shl eax, 4
@@ -329,6 +354,7 @@ render_char24:
 .done:
 	ret
 
+align 32
 .font_data			dd 0
 .row				db 0
 .column				db 0
@@ -340,13 +366,14 @@ render_char24:
 ; In\	CX/DX = X/Y pos
 ; In\	ESI = Font data
 ; Out\	Nothing
-
+align 32
 render_char_transparent:
 	cmp [screen.bpp], 32
 	je render_char_transparent32
 
 	jmp render_char_transparent24
 
+align 32
 render_char_transparent32:
 	and eax, 0xFF
 	shl eax, 4
@@ -405,10 +432,12 @@ render_char_transparent32:
 .done:
 	ret
 
+align 32
 .font_data			dd 0
 .row				db 0
 .column				db 0
 
+align 32
 render_char_transparent24:
 	and eax, 0xFF
 	shl eax, 4
@@ -469,6 +498,7 @@ render_char_transparent24:
 .done:
 	ret
 
+align 32
 .font_data			dd 0
 .row				db 0
 .column				db 0
@@ -477,7 +507,7 @@ render_char_transparent24:
 ; Sets the system font
 ; In\	ESI = 4k buffer to use as font
 ; Out\	Nothing
-
+align 32
 set_font:
 	mov [system_font], esi
 	ret
@@ -487,7 +517,7 @@ set_font:
 ; In\	EBX = Background
 ; In\	ECX = Foreground
 ; Out\	Nothing
-
+align 32
 set_text_color:
 	and ebx, 0xFFFFFF
 	and ecx, 0xFFFFFF
@@ -500,7 +530,7 @@ set_text_color:
 ; In\	ESI = String
 ; In\	CX/DX = X/Y pos
 ; Out\	Nothing
-
+align 32
 print_string:
 	mov [.x], cx
 	mov [.y], dx
@@ -551,7 +581,7 @@ print_string:
 ; In\	ESI = String
 ; In\	CX/DX = X/Y pos
 ; Out\	Nothing
-
+align 32
 print_string_transparent:
 	mov [.x], cx
 	mov [.y], dx
@@ -599,7 +629,7 @@ print_string_transparent:
 
 ; scroll_screen:
 ; Scrolls the screen
-
+align 32
 scroll_screen:
 	pusha
 
@@ -621,7 +651,7 @@ scroll_screen:
 ; Puts a char at cursor position
 ; In\	AL = Character
 ; Out\	Nothing
-
+align 32
 put_char:
 	pusha
 
@@ -689,7 +719,7 @@ put_char:
 ; In\	SI/DI = Width/Height
 ; In\	EDX = Color
 ; Out\	Nothing
-
+align 32
 fill_rect:
 	mov [.x], ax
 	mov [.y], bx
@@ -709,6 +739,7 @@ fill_rect:
 
 	mov [.current_line], 0
 
+align 32
 .loop:
 	mov edi, [.offset]
 	mov eax, [.color]
@@ -716,6 +747,7 @@ fill_rect:
 	cmp [screen.bpp], 32
 	je .32
 
+align 32
 .24:
 	mov eax, [.color]
 	stosw
@@ -726,6 +758,7 @@ fill_rect:
 	jl .next_line
 	jmp .24
 
+align 32
 .32:
 	shr ecx, 2
 	rep stosd
@@ -740,10 +773,12 @@ fill_rect:
 	add [.offset], eax
 	jmp .loop
 
+align 32
 .done:
 	call redraw_screen
 	ret
 
+align 32
 .x				dw 0
 .y				dw 0
 .width				dw 0
@@ -760,7 +795,7 @@ fill_rect:
 ; In\	ECX = Transparent color
 ; In\	EDX = Pixel buffer
 ; Out\	Nothing
-
+align 32
 blit_buffer:
 	mov [.transparent], ecx
 	mov [.x], ax
@@ -782,12 +817,14 @@ blit_buffer:
 	cmp [screen.bpp], 24
 	je .24
 
+align 32
 .32:
 	mov esi, [.buffer]
 	mov edi, [.offset]
 	movzx ecx, [.width]
 	mov edx, [.transparent]
 
+align 32
 .32_loop:
 	lodsd
 	cmp eax, edx
@@ -801,6 +838,7 @@ blit_buffer:
 	add edi, 4
 	loop .32_loop
 
+align 32
 .32_done:
 	mov [.buffer], esi
 
@@ -849,6 +887,7 @@ blit_buffer:
 	call redraw_screen
 	ret
 
+align 32
 .transparent			dd 0
 .x				dw 0
 .y				dw 0
@@ -856,6 +895,7 @@ blit_buffer:
 .height				dw 0
 .end_x				dw 0
 .end_y				dw 0
+align 32
 .buffer				dd 0
 .offset				dd 0
 .current_line			dd 0
@@ -866,7 +906,7 @@ blit_buffer:
 ; In\	SI/DI = Width/Height
 ; In\	EDX = Pixel buffer
 ; Out\	Nothing
-
+align 32
 blit_buffer_no_transparent:
 	mov [.x], ax
 	mov [.y], bx
@@ -892,6 +932,7 @@ blit_buffer_no_transparent:
 	mov edi, [.offset]
 	movzx ecx, [.width]
 
+align 32
 .32_loop:
 	shl ecx, 2
 	call memcpy	; SSE memcpy
@@ -932,20 +973,22 @@ blit_buffer_no_transparent:
 
 	jmp .24
 
+align 32
 .done:
 	call redraw_screen
 	ret
 
+align 32
 .x				dw 0
 .y				dw 0
 .width				dw 0
 .height				dw 0
 .end_x				dw 0
 .end_y				dw 0
+align 32
 .buffer				dd 0
 .offset				dd 0
 .current_line			dd 0
-
 
 ; decode_bmp:
 ; Decodes a 24-bit BMP image
@@ -953,7 +996,7 @@ blit_buffer_no_transparent:
 ; In\	EBX = Pointer to memory location to store raw pixel buffer
 ; Out\	ECX = Size of raw pixel buffer in bytes, -1 on error
 ; Out\	SI/DI = Width/Height of image
-
+align 32
 decode_bmp:
 	mov [.image], edx
 	mov [.memory], ebx
@@ -1006,6 +1049,7 @@ decode_bmp:
 	mov edi, 0
 	ret
 
+align 32
 .image				dd 0
 .memory				dd 0
 .width				dd 0
@@ -1018,7 +1062,7 @@ decode_bmp:
 ; In\	EDX = Pointer to pixel data
 ; In\	SI/DI = Width/Height
 ; Out\	Buffer inverted
-
+align 32
 invert_buffer_vertically:
 	mov [.buffer], edx
 	mov [.width], si
@@ -1052,9 +1096,11 @@ invert_buffer_vertically:
 .done:
 	ret
 
+align 32
 .buffer					dd 0
 .width					dw 0
 .height					dw 0
+align 32
 .current_row				dd 0
 .current_line				dd 0
 .bytes_per_line				dd 0

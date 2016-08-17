@@ -151,9 +151,9 @@ ata_detect:
 	call install_isr
 
 	mov al, 14
-	call pic_unmask
+	call irq_unmask
 	mov al, 15
-	call pic_unmask
+	call irq_unmask
 
 	; reset, also enables IRQs
 	call ata_reset

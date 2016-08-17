@@ -6,9 +6,10 @@ use16
 
 VBE_PHYSICAL_BUFFER		= 0xDF000000
 VBE_BACK_BUFFER			= 0xDF800000
-DEFAULT_WIDTH			= 800
-DEFAULT_HEIGHT			= 600
+DEFAULT_WIDTH			= 640
+DEFAULT_HEIGHT			= 480
 
+align 32
 vbe_width			dw DEFAULT_WIDTH
 vbe_height			dw DEFAULT_HEIGHT
 
@@ -65,7 +66,7 @@ mode_info_block:
 	.off_screen_mem_size	dw 0
 	.reserved1:		times 206 db 0
 
-align 16
+align 32
 screen:
 	.width			dd 0
 	.height			dd 0
