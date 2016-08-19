@@ -66,16 +66,16 @@ wm_running			db 0
 ; Window Theme!
 ; TO-DO: Set these values from a theme file from the disk (i.e. make the gui costomizable)
 align 32
-wm_color			dd 0x004288
+wm_color			dd 0x00A2E8
+;wm_color			dd 0x004288
 ;window_header			dd 0xE8A200
-window_header			dd 0x00A2E8
-window_inactive_header		dd 0x222222
-window_inactive_title		dd 0xFFFFFF
-window_border			dd 0x444444
-window_title			dd 0xFFFFFF
-window_close_color		dd 0xC02020
-window_background		dd 0xD8D8D8
-;window_opacity			dd 0		; when I implement alpha blending i'll have this ;)
+window_header			dd 0x808080
+window_title			dd 0x000000
+window_inactive_title		dd 0x000000
+window_border			dd 0xD8D8D8
+window_close_color		dd 0xFF3030
+window_background		dd 0xFFFFFF
+window_opacity			db 2
 
 ; wm_init:
 ; Initializes the window manager
@@ -500,14 +500,8 @@ align 32
 	;add di, 32
 	mov di, 24
 	mov edx, [window_border]
-	call fill_rect
-
-	;mov ax, [.x]
-	;mov bx, [.y]
-	;mov si, [.width]
-	;mov di, 2
-	;mov edx, [window_inactive_header]
-	;call fill_rect
+	mov cl, [window_opacity]
+	call alpha_fill_rect
 
 	; the close button
 	mov ax, [.x]
@@ -571,7 +565,8 @@ align 32
 	;add di, 32
 	mov di, 24
 	mov edx, [window_border]
-	call fill_rect
+	mov cl, [window_opacity]
+	call alpha_fill_rect
 
 	mov ax, [.x]
 	mov bx, [.y]

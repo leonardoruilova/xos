@@ -1106,4 +1106,108 @@ align 32
 .bytes_per_line				dd 0
 .last_line				dd 0
 
+; alpha_blend_colors:
+; Blends two colors smoothly
+; In\	EAX = Foreground
+; In\	EBX = Background
+; In\	DL = Alpha intensity (1 = less transparent, 4 = most transparent)
+; Out\	EAX = New color
+; Out\	EBX is destroyed
+align 64
+alpha_blend_colors:
+	xchg ecx, edx
+	;and eax, 0xF0F0F0
+	;and ebx, 0xF0F0F0
+
+	;mov cl, dl
+	shr eax, cl
+	shr ebx, 1
+
+	and eax, 0x7F7F7F
+	and ebx, 0x7F7F7F
+
+	add eax, ebx
+	xchg ecx, edx
+	ret
+
+; alpha_fill_rect:
+; Fills a rectangle will alpha blending, only works on 32bpp modes for performance's sake
+; In\	AX/BX = X/Y pos
+; In\	SI/DI = Width/Height
+; In\	CL = Alpha intensity
+; In\	EDX = Color
+; Out\	Nothing
+align 64
+alpha_fill_rect:
+	cmp [screen.bpp], 32		; only support alpha blending in 32-bit graphic modes
+	jne fill_rect			; otherwise this causes too much loss of performance
+
+	; ensure a valid alpha intensity
+	cmp cl, 1
+	jl fill_rect
+	cmp cl, 4
+	jg fill_rect
+
+	mov [.x], ax
+	mov [.y], bx
+	mov [.width], si
+	mov [.height], di
+	mov [.intensity], cl
+	mov [.color], edx
+	mov [.current_line], 0
+
+	mov ax, [.x]
+	mov bx, [.y]
+	call get_pixel_offset
+	mov [.offset], edi
+
+	;movzx eax, [.width]
+	;shl eax, 2	; mul 4
+	;mov [.bytes_per_line], eax
+
+.start:
+	mov edi, [.offset]
+	mov esi, [.color]	; avoid reading from memory too much for performance
+	movzx ecx, [.width]	; counter
+	jmp .loop
+
+align 32
+.loop:
+	mov ebx, [edi]		; background is the already-existing pixel
+	mov eax, esi
+	mov dl, [.intensity]
+	call alpha_blend_colors
+	stosd
+
+	loop .loop
+
+.next_line:
+	inc [.current_line]
+	mov cx, [.height]
+	cmp [.current_line], cx
+	jge .done
+
+	; next offset
+	mov edi, [screen.bytes_per_line]
+	add [.offset], edi
+	jmp .start
+
+.done:
+	ret
+
+align 2
+.x			dw 0
+.y			dw 0
+.width			dw 0
+.height			dw 0
+.intensity		db 0
+align 8
+.color			dd 0
+.offset			dd 0
+.bytes_per_line		dd 0
+.current_line		dw 0
+
+
+
+
 

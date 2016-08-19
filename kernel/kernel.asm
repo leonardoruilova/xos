@@ -7,7 +7,7 @@ org 0x1000
 
 	jmp 0x0000:kmain16
 
-	kernel_version			db "xOS32 v0.05 (2 August 2016)",0
+	kernel_version			db "xOS32 v0.06 (18 August 2016)",0
 	copyright_str			db "Copyright (C) 2016 by Omar Mohammad, all rights reserved.",0
 	newline				db 10,0
 
@@ -189,13 +189,15 @@ kmain32:
 	;call apic_init
 	call pci_init
 	call blkdev_init
-	;call xfs_detect
+	call xfs_detect
 	call wm_init
 	call use_back_buffer
 	call unlock_screen
 
 	; for testing
 	mov edx, task1
+	call create_task_memory
+	mov edx, task2
 	call create_task_memory
 
 ; idle_process:
@@ -207,24 +209,160 @@ idle_process:
 	sti
 	hlt
 	call yield
-
 task1:
 	mov ebp, 0
-	xor ax, ax
-	xor bx, bx
-	mov si, 128
-	mov di, 128
+	mov ax, 48
+	mov bx, 48
+	mov si, 360
+	mov di, 256
 	mov dx, 0
 	mov ecx, .title
 	int 0x60
 
-.yield:
+	mov ebp, 7
+	mov eax, 0
+	mov cx, 16
+	mov dx, 16
+	mov esi, .text
+	mov ebx, 0x000000
+	int 0x60
+
+	mov ebp, 7
+	mov eax, 0
+	mov cx, 16
+	mov dx, 32
+	mov esi, .total
+	mov ebx, 0
+	int 0x60
+
+	mov eax, [idle_time]
+	add eax, [nonidle_time]
+	call int_to_string
+
+	mov ebp, 7
+	mov eax, 0
+	mov cx, 16+(.total_len * 8)
+	mov dx, 32
+	mov ebx, 0
+	int 0x60
+
+	mov ebp, 7
+	mov eax, 0
+	mov cx, 16
+	mov dx, 48
+	mov esi, .nonidle
+	mov ebx, 0
+	int 0x60
+
+	mov eax, [nonidle_time]
+	call int_to_string
+
+	mov ebp, 7
+	mov eax, 0
+	mov cx, 16+(.nonidle_len * 8)
+	mov dx, 48
+	mov ebx, 0
+	int 0x60
+
+.wait:
+	; read window event
+	mov ebp, 4
+	mov eax, 0
+	int 0x60
+
+	test ax, WM_LEFT_CLICK
+	jnz .clicked
+
 	mov ebp, 1
 	int 0x60
-	jmp .yield
+	jmp .wait
 
-.title			db "Test Window",0
+.clicked:
+	mov ebp, 8
+	mov eax, 0
+	mov ebx, 0xFFFFFF
+	int 0x60
 
+	mov ebp, 7
+	mov eax, 0
+	mov cx, 16
+	mov dx, 16
+	mov esi, .text
+	mov ebx, 0x000000
+	int 0x60
+
+	mov ebp, 7
+	mov eax, 0
+	mov cx, 16
+	mov dx, 32
+	mov esi, .total
+	mov ebx, 0
+	int 0x60
+
+	mov eax, [idle_time]
+	add eax, [nonidle_time]
+	call int_to_string
+
+	mov ebp, 7
+	mov eax, 0
+	mov cx, 16+(.total_len * 8)
+	mov dx, 32
+	mov ebx, 0
+	int 0x60
+
+	mov ebp, 7
+	mov eax, 0
+	mov cx, 16
+	mov dx, 48
+	mov esi, .nonidle
+	mov ebx, 0
+	int 0x60
+
+	mov eax, [nonidle_time]
+	call int_to_string
+
+	mov ebp, 7
+	mov eax, 0
+	mov cx, 16+(.nonidle_len * 8)
+	mov dx, 48
+	mov ebx, 0
+	int 0x60
+
+	jmp .wait
+
+.title			db "CPU Usage",0
+.text			db "Click this window to refresh CPU usage. ",0
+.total			db "Total time: ",0
+.total_len		= $ - .total - 1
+.nonidle		db "Non-idle time: ",0
+.nonidle_len		= $ - .nonidle - 1
+
+task2:
+	mov ebp, 0
+	mov ax, 350
+	mov bx, 192
+	mov si, 256
+	mov di, 130
+	mov dx, 0
+	mov ecx, .title
+	int 0x60
+
+	mov ebp, 7
+	mov eax, 1
+	mov esi, .text
+	mov cx, 8
+	mov dx, 16
+	mov ebx, 0
+	int 0x60
+
+.hang:
+	mov ebp, 1
+	int 0x60
+	jmp .hang
+
+.title			db "Hello world",0
+.text			db "Welcome to the Hello World ",10
+			db "application!",0
 
 	;
 	; END OF KERNEL INITIALIZATION CODE
@@ -277,15 +415,13 @@ task1:
 	include "kernel/tasking/syscalls.asm"	; System calls table and handler
 
 	; Filesystem
-	include "kernel/fs/xfs.asm"		; xFS
+	include "kernel/fs/xfs.asm"		; XFS
 	;include "kernel/fs/iso9660.asm"	; ISO9660 will be here someday
 
 	; Default mouse cursor
 	cursor:
-	;file "kernel/gui/themes/cursor_black.bmp"
-	file "kernel/gui/themes/cursor_white.bmp"	; comment the above and uncomment this if you'd like
-							; it's just personal opinion but I like the black cursor
-
+	;file "kernel/gui/themes/cursor_black.bmp"	; choose whichever cursor you like
+	file "kernel/gui/themes/cursor_white.bmp"	; or even make your own; in Paint and GIMP use a 24-bit bitmap
 	; Default bitmap font
 	font:
 	file "kernel/fonts/alotware.bin"
