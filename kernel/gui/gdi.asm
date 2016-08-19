@@ -101,10 +101,6 @@ get_pixel_offset:
 	and eax, 0xFFFF
 	and ebx, 0xFFFF
 
-	cmp [screen.bpp], 32
-	jne .24
-
-.32:
 	push eax	; x
 	mov ax, bx
 	mov ebx, [screen.bytes_per_line]
@@ -119,28 +115,9 @@ get_pixel_offset:
 	add esi, VBE_PHYSICAL_BUFFER
 	add edi, VBE_BACK_BUFFER
 
-.done:
 	cmp [current_buffer], 1
 	je .swap
 	ret
-
-.24:
-	push eax	; x
-	mov ax, bx
-	mov ebx, [screen.bytes_per_line]
-	mul ebx		; y*pitch
-
-	pop ebx		; ebx=x
-	mov edx, ebx
-	add ebx, edx	; mul 2
-	add ebx, edx	; mul 3
-	add eax, ebx
-
-	mov esi, eax
-	mov edi, eax
-	add esi, VBE_PHYSICAL_BUFFER
-	add edi, VBE_BACK_BUFFER
-	jmp .done
 
 .swap:
 	xchg esi, edi	; swap ;)
@@ -157,18 +134,6 @@ put_pixel:
 	call get_pixel_offset
 
 	pop eax
-	cmp [screen.bpp], 32
-	je .32
-
-.24:
-	stosw
-	shr eax, 16
-	stosb
-
-	call redraw_screen
-	ret
-
-.32:
 	stosd
 	call redraw_screen
 	ret
@@ -182,25 +147,6 @@ clear_screen:
 	mov [screen.x], 0
 	mov [screen.y], 0
 
-	cmp [screen.bpp], 32
-	je .32
-
-.24:
-	mov edi, VBE_BACK_BUFFER
-	mov ecx, [screen.screen_size]
-
-.24_loop:
-	mov eax, ebx
-	stosw
-	shr eax, 16
-	stosb
-	loop .24_loop
-
-	call redraw_screen
-	ret
-
-align 32
-.32:
 	mov edi, VBE_BACK_BUFFER
 	mov ecx, [screen.screen_size]
 	shr ecx, 2
@@ -218,13 +164,6 @@ align 32
 ; Out\	Nothing
 align 32
 render_char:
-	cmp [screen.bpp], 32
-	je render_char32
-
-	jmp render_char24
-
-align 32
-render_char32:
 	and eax, 0xFF
 	shl eax, 4
 	add eax, esi
@@ -290,76 +229,6 @@ align 32
 .row				db 0
 .column				db 0
 
-align 32
-render_char24:
-	and eax, 0xFF
-	shl eax, 4
-	add eax, esi
-	mov [.font_data], eax
-
-	mov ax, cx
-	mov bx, dx
-	call get_pixel_offset
-
-	xor dl, dl
-	mov [.row], dl
-	mov [.column], dl
-
-	mov esi, [.font_data]
-	mov dl, [esi]
-	inc [.font_data]
-
-.put_column:
-	;mov dl, [.byte]
-	test dl, 0x80
-	jz .background
-
-.foreground:
-	mov eax, [text_foreground]
-	jmp .put
-
-.background:
-	mov eax, [text_background]
-
-.put:
-	stosw
-	shr eax, 16
-	stosb
-	jmp .next_column
-
-.next_column:
-	inc [.column]
-	cmp [.column], 8
-	je .next_row
-
-	shl dl, 1
-	jmp .put_column
-
-.next_row:
-	mov [.column],0
-	inc [.row]
-	cmp [.row], 16
-	je .done
-
-	mov eax, [screen.bytes_per_pixel]
-	shl eax, 3
-	sub edi, eax
-	add edi, [screen.bytes_per_line]
-
-	mov esi, [.font_data]
-	mov dl, [esi]
-	inc [.font_data]
-	jmp .put_column
-
-.done:
-	ret
-
-align 32
-.font_data			dd 0
-.row				db 0
-.column				db 0
-
-
 ; render_char_transparent:
 ; Renders a character with transparent background
 ; In\	AL = Character
@@ -368,13 +237,6 @@ align 32
 ; Out\	Nothing
 align 32
 render_char_transparent:
-	cmp [screen.bpp], 32
-	je render_char_transparent32
-
-	jmp render_char_transparent24
-
-align 32
-render_char_transparent32:
 	and eax, 0xFF
 	shl eax, 4
 	add eax, esi
@@ -422,72 +284,6 @@ render_char_transparent32:
 	je .done
 
 	sub edi, 8*4
-	add edi, [screen.bytes_per_line]
-
-	mov esi, [.font_data]
-	mov dl, [esi]
-	inc [.font_data]
-	jmp .put_column
-
-.done:
-	ret
-
-align 32
-.font_data			dd 0
-.row				db 0
-.column				db 0
-
-align 32
-render_char_transparent24:
-	and eax, 0xFF
-	shl eax, 4
-	add eax, esi
-	mov [.font_data], eax
-
-	mov ax, cx
-	mov bx, dx
-	call get_pixel_offset
-
-	xor dl, dl
-	mov [.row], dl
-	mov [.column], dl
-
-	mov esi, [.font_data]
-	mov dl, [esi]
-	inc [.font_data]
-
-.put_column:
-	;mov dl, [.byte]
-	test dl, 0x80
-	jz .background
-
-.foreground:
-	mov eax, [text_foreground]
-
-.put:
-	stosw
-	shr eax, 16
-	stosb
-	jmp .next_column
-
-.background:
-	add edi, 3
-
-.next_column:
-	inc [.column]
-	cmp [.column], 8
-	je .next_row
-
-	shl dl, 1
-	jmp .put_column
-
-.next_row:
-	mov [.column],0
-	inc [.row]
-	cmp [.row], 16
-	je .done
-
-	sub edi, 8*3
 	add edi, [screen.bytes_per_line]
 
 	mov esi, [.font_data]
@@ -739,27 +535,11 @@ fill_rect:
 
 	mov [.current_line], 0
 
-align 32
 .loop:
 	mov edi, [.offset]
 	mov eax, [.color]
 	mov ecx, [.bytes_per_line]
-	cmp [screen.bpp], 32
-	je .32
 
-align 32
-.24:
-	mov eax, [.color]
-	stosw
-	shr eax, 16
-	stosb
-	sub ecx, 3
-	cmp ecx, 3
-	jl .next_line
-	jmp .24
-
-align 32
-.32:
 	shr ecx, 2
 	rep stosd
 
@@ -773,7 +553,6 @@ align 32
 	add [.offset], eax
 	jmp .loop
 
-align 32
 .done:
 	call redraw_screen
 	ret
@@ -814,32 +593,26 @@ blit_buffer:
 	call get_pixel_offset
 	mov [.offset], edi
 
-	cmp [screen.bpp], 24
-	je .24
-
-align 32
-.32:
+.start:
 	mov esi, [.buffer]
 	mov edi, [.offset]
 	movzx ecx, [.width]
 	mov edx, [.transparent]
 
-align 32
-.32_loop:
+.loop:
 	lodsd
 	cmp eax, edx
-	je .32_skip
+	je .skip
 	stosd
-	loop .32_loop
+	loop .loop
 
-	jmp .32_done
+	jmp .line_done
 
-.32_skip:
+.skip:
 	add edi, 4
-	loop .32_loop
+	loop .loop
 
-align 32
-.32_done:
+.line_done:
 	mov [.buffer], esi
 
 	mov eax, [screen.bytes_per_line]
@@ -849,39 +622,7 @@ align 32
 	cmp [.current_line], eax
 	jge .done
 
-	jmp .32
-
-.24:
-	mov esi, [.buffer]
-	mov edi, [.offset]
-	movzx ecx, [.width]
-	mov edx, [.transparent]
-
-.24_loop:
-	lodsd
-	cmp eax, edx
-	je .24_skip
-	stosw
-	shr eax, 16
-	stosb
-	loop .24_loop
-	jmp .24_done
-
-.24_skip:
-	add edi, 3
-	loop .24_loop
-
-.24_done:
-	mov [.buffer], esi
-
-	mov eax, [screen.bytes_per_line]
-	add [.offset], eax
-	inc [.current_line]
-	movzx eax, [.height]
-	cmp [.current_line], eax
-	jge .done
-
-	jmp .24
+	jmp .start
 
 .done:
 	call redraw_screen
@@ -924,20 +665,16 @@ blit_buffer_no_transparent:
 	call get_pixel_offset
 	mov [.offset], edi
 
-	cmp [screen.bpp], 24
-	je .24
-
-.32:
+.start:
 	mov esi, [.buffer]
 	mov edi, [.offset]
 	movzx ecx, [.width]
 
-align 32
-.32_loop:
+.loop:
 	shl ecx, 2
 	call memcpy	; SSE memcpy
 
-.32_done:
+.line_done:
 	mov [.buffer], esi
 
 	mov eax, [screen.bytes_per_line]
@@ -947,33 +684,8 @@ align 32
 	cmp [.current_line], eax
 	jge .done
 
-	jmp .32
+	jmp .start
 
-.24:
-	mov esi, [.buffer]
-	mov edi, [.offset]
-	movzx ecx, [.width]
-
-.24_loop:
-	movsw
-	movsb
-	inc esi
-	loop .24_loop
-	jmp .24_done
-
-.24_done:
-	mov [.buffer], esi
-
-	mov eax, [screen.bytes_per_line]
-	add [.offset], eax
-	inc [.current_line]
-	movzx eax, [.height]
-	cmp [.current_line], eax
-	jge .done
-
-	jmp .24
-
-align 32
 .done:
 	call redraw_screen
 	ret
@@ -1131,7 +843,7 @@ alpha_blend_colors:
 	ret
 
 ; alpha_fill_rect:
-; Fills a rectangle will alpha blending, only works on 32bpp modes for performance's sake
+; Fills a rectangle will alpha blending
 ; In\	AX/BX = X/Y pos
 ; In\	SI/DI = Width/Height
 ; In\	CL = Alpha intensity
@@ -1139,9 +851,6 @@ alpha_blend_colors:
 ; Out\	Nothing
 align 64
 alpha_fill_rect:
-	cmp [screen.bpp], 32		; only support alpha blending in 32-bit graphic modes
-	jne fill_rect			; otherwise this causes too much loss of performance
-
 	; ensure a valid alpha intensity
 	cmp cl, 1
 	jl fill_rect
@@ -1169,9 +878,7 @@ alpha_fill_rect:
 	mov edi, [.offset]
 	mov esi, [.color]	; avoid reading from memory too much for performance
 	movzx ecx, [.width]	; counter
-	jmp .loop
 
-align 32
 .loop:
 	mov ebx, [edi]		; background is the already-existing pixel
 	mov eax, esi

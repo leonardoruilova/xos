@@ -7,12 +7,13 @@ use32
 TIMER_FREQUENCY			= 100			; 100 Hz is way more than enough
 MAXIMUM_TASK_TIME		= TIMER_FREQUENCY / 10
 
+align 8
 timer_ticks			dd 0
 task_time			dd 0
 
 ; pit_init:
 ; Initialize the PIT
-
+align 64
 pit_init:
 	mov esi, .msg
 	call kprint
@@ -45,7 +46,7 @@ pit_init:
 
 ; pit_irq:
 ; PIT IRQ Handler
-
+align 64
 pit_irq:
 	push eax
 

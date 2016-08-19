@@ -64,7 +64,7 @@ align 32
 wm_running			db 0
 
 ; Window Theme!
-; TO-DO: Set these values from a theme file from the disk (i.e. make the gui costomizable)
+; TO-DO: Set these values from a theme file from the disk (i.e. make the gui customizable)
 align 32
 wm_color			dd 0x00A2E8
 ;wm_color			dd 0x004288
@@ -75,7 +75,7 @@ window_inactive_title		dd 0x000000
 window_border			dd 0xD8D8D8
 window_close_color		dd 0xFF3030
 window_background		dd 0xFFFFFF
-window_opacity			db 2
+window_opacity			db 1
 
 ; wm_init:
 ; Initializes the window manager
@@ -604,7 +604,6 @@ align 32
 	call blit_buffer_no_transparent
 	jmp .done
 
-align 32
 .done:
 	call redraw_mouse	; this takes care of all the dirty work before actually drawing the cursor ;)
 	ret

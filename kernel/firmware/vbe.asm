@@ -106,19 +106,19 @@ do_vbe:
 	mov bx, [vbe_height]
 	mov cl, 32
 	call vbe_set_mode
-	jc .try_24bpp
+	jc .bad_mode		; removed support for 24bpp modes...
 
 	ret
 
-.try_24bpp:
-	; use 24bpp as a fallback
-	mov ax, [vbe_width]
-	mov bx, [vbe_height]
-	mov cl, 24
-	call vbe_set_mode
-	jc .bad_mode
-
-	ret
+;.try_24bpp:
+;	; use 24bpp as a fallback
+;	mov ax, [vbe_width]
+;	mov bx, [vbe_height]
+;	mov cl, 24
+;	call vbe_set_mode
+;	jc .bad_mode
+;
+;	ret
 
 .no_vbe:
 	mov si, .no_vbe_msg
