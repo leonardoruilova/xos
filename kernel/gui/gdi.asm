@@ -315,8 +315,6 @@ set_font:
 ; Out\	Nothing
 align 32
 set_text_color:
-	and ebx, 0xFFFFFF
-	and ecx, 0xFFFFFF
 	mov [text_background], ebx
 	mov [text_foreground], ecx
 	ret
@@ -345,7 +343,7 @@ print_string:
 	push esi
 	mov cx, [.x]
 	mov dx, [.y]
-	mov esi, [system_font]
+	mov esi, font
 	call render_char
 	pop esi
 
@@ -828,8 +826,8 @@ align 32
 align 64
 alpha_blend_colors:
 	xchg ecx, edx
-	;and eax, 0xF0F0F0
-	;and ebx, 0xF0F0F0
+	and eax, 0xF0F0F0
+	and ebx, 0xF0F0F0
 
 	;mov cl, dl
 	shr eax, cl
@@ -842,15 +840,15 @@ alpha_blend_colors:
 	xchg ecx, edx
 	ret
 
-; alpha_fill_rect:
-; Fills a rectangle will alpha blending
+; alpha_fill_rect_no_sse:
+; Fills a rectangle will alpha blending, without SSE
 ; In\	AX/BX = X/Y pos
 ; In\	SI/DI = Width/Height
 ; In\	CL = Alpha intensity
 ; In\	EDX = Color
 ; Out\	Nothing
 align 64
-alpha_fill_rect:
+alpha_fill_rect_no_sse:
 	; ensure a valid alpha intensity
 	cmp cl, 1
 	jl fill_rect
@@ -915,6 +913,112 @@ align 8
 .current_line		dw 0
 
 
+;
+; EXPERIMENTAL SECTION: SSE-optimized alpha blending functions
+;
 
+; alpha_blend_colors_packed:
+; Blends 4 colors in one SSE operation
+; In\	XMM0 = Foreground, 4 pixels
+; In\	XMM1 = Background, 4 pixels
+; In\	DL = Intensity
+; Out\	XMM0 = New color, 4 pixels
+align 64
+alpha_blend_colors_packed:
+	and edx, 0xF
+	mov dword[.intensity], edx
+
+	movdqa xmm2, dqword[.mask]
+	andpd xmm0, xmm2
+	andpd xmm1, xmm2
+
+	psrlq xmm0, [.intensity]		; shift foreground by intensity
+	psrlq xmm1, 1
+	paddq xmm0, xmm1
+
+	ret
+
+align 8
+.intensity			dq 0
+align 16	; for sse...
+.mask				dq 0x00F0F0F000F0F0F0
+				dq 0x00F0F0F000F0F0F0
+
+; alpha_fill_rect:
+; Fills a rectangle with alpha blending, using SSE for acceleration
+; In\	AX/BX = X/Y pos
+; In\	SI/DI = Width/Height
+; In\	CL = Alpha intensity
+; In\	EDX = Color
+; Out\	Nothing
+align 64
+alpha_fill_rect:
+	test si, 3		; must be multiple of 4, because the SSE function works on 4 pixels at a time
+	jnz alpha_fill_rect_no_sse
+
+	cmp cl, 1
+	jl fill_rect
+	cmp cl, 4
+	jg fill_rect
+
+	mov [.x], ax
+	mov [.y], bx
+	mov [.width], si
+	mov [.height], di
+	mov [.alpha], cl
+
+	mov dword[.color], edx
+	mov dword[.color+4], edx
+	mov dword[.color+8], edx
+	mov dword[.color+12], edx
+
+	mov ax, [.x]
+	mov bx, [.y]
+	call get_pixel_offset
+	mov [.offset], edi
+
+	mov [.current_line], 0
+	movdqa xmm3, dqword[.color]		; will use XMM3 to store the color
+
+.start:
+	mov edi, [.offset]
+	movzx ecx, [.width]
+	shr ecx, 2		; div 4, because we'll work on 4 pixels at a time
+
+.loop:
+	movdqa xmm0, xmm3	; foreground
+	movdqu xmm1, [edi]	; background
+	mov dl, [.alpha]
+	call alpha_blend_colors_packed		; sse alpha blending
+
+	movdqu [edi], xmm0
+	add edi, 16
+	loop .loop
+
+.next_line:
+	inc [.current_line]
+	mov cx, [.height]
+	cmp [.current_line], cx
+	jge .done
+
+	; next offset
+	mov edi, [screen.bytes_per_line]
+	add [.offset], edi
+	jmp .start
+
+.done:
+	ret
+
+
+align 4
+.x			dw 0
+.y			dw 0
+.width			dw 0
+.height			dw 0
+.alpha			db 0
+align 16
+.color:			times 2 dq 0		; sse stuff ;)
+.offset			dd 0
+.current_line		dw 0
 
 
