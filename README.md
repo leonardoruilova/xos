@@ -13,11 +13,12 @@ xOS is still under early stages of development; although the following features 
 * VESA 2.0-compatible BIOS, capable of true-color.
 * Little over 16 MB of RAM.
 * Few megabytes disk space.
+
 For building requirements, you'll need [Flat Assembler](http://flatassembler.net) in your `$PATH`. Then, run `build.sh` and it will build the xOS kernel to `disk.hdd`. Feel free to tweak with xOS as you like, just please give me feedback.
 
 #Testing xOS
 xOS is provided as a disk image. `disk.hdd` in this repository can be considered the latest nightly build. It is very likely unstable and may crash. Releases are under the release tab, or on the site. This disk image can be used on Bochs, QEMU and VirtualBox. On Bochs, the CHS values are 71/16/63. For now, xOS only supports ATA hard disks, and so don't use SATA on VirtualBox, and attach it to the IDE bus instead.  
-In the very near future, 24-bit display support will be removed for code optimization, and because almost any PC built since 2000 should have 32-bit display support, and so when testing under QEMU, run like this:  
+To test xOS under QEMU, run like this:  
 ````qemu-system-i386 -hda disk.hdd -vga std````  
 
 #Contact
