@@ -69,6 +69,25 @@ pit_irq:
 	pop eax
 	iret
 
+; pit_sleep:
+; Sleeps using the PIT
+; In\	EAX = 1/100 seconds to wait
+; Out\	Nothing
+
+pit_sleep:
+	add eax, [timer_ticks]
+
+.loop:
+	cmp [timer_ticks], eax
+	jge .done
+
+	sti
+	hlt
+	jmp .loop
+
+.done:
+	ret
+
 
 
 

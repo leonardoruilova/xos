@@ -62,6 +62,7 @@ window_handles			dd 0
 wm_background			dd 0
 align 32
 wm_running			db 0
+wm_dirty			db 1	; when set to 1, the WM needs a redraw
 
 ; Window Theme!
 ; TO-DO: Set these values from a theme file from the disk (i.e. make the gui customizable)
@@ -70,12 +71,20 @@ wm_color			dd 0x00A2E8
 ;wm_color			dd 0x004288
 ;window_header			dd 0xE8A200
 window_header			dd 0x808080
-window_title			dd 0x000000
+window_title			dd 0xD8D8D8
 window_inactive_title		dd 0x000000
 window_border			dd 0xD8D8D8
+;window_active_border		dd 0x707070
+window_active_border		dd 0x000080
 window_close_color		dd 0xFF3030
 window_background		dd 0xFFFFFF
-window_opacity			db 1
+window_opacity			db 0		; valid values are 0 to 4, 0 = opaque, 1 = less transparent, 4 = most transparent.
+window_border_x_min		dw 8		; max x pos for a 0 width window
+window_border_y_min		dw 30		; max y pos for a 0 height window
+window_title_x			dw 24
+window_title_y			dw 4
+window_canvas_x			dw 4
+window_canvas_y			dw 24
 
 ; wm_init:
 ; Initializes the window manager
@@ -182,7 +191,6 @@ wm_get_window:
 	clc
 	ret
 
-align 32
 .no:
 	stc
 	ret
@@ -228,13 +236,12 @@ wm_make_handle:
 
 	mov edx, [screen.width]
 	sub dx, [.width]
-	;sub dx, 8
+	sub dx, [window_border_x_min]
 	mov [eax+WINDOW_MAX_X], dx
 
 	mov edx, [screen.height]
 	sub dx, [.height]
-	;sub dx, 32
-	sub dx, 24
+	sub dx, [window_border_y_min]
 	mov [eax+WINDOW_MAX_Y], dx
 
 	mov edx, [.framebuffer]
@@ -325,6 +332,8 @@ wm_create_window:
 	mov eax, [.handle]
 	mov [active_window], eax	; by default, when a new window is created, the focus goes to it
 	inc [open_windows]
+
+	mov [wm_dirty], 1
 	call wm_redraw
 
 	mov eax, [.handle]	; return the window handle to the application
@@ -438,12 +447,11 @@ wm_is_mouse_on_window:
 	mov eax, 1
 	ret
 
-align 32
 .no:
 	xor eax, eax	; mov eax, 0
 	ret
 
-align 32
+align 2
 .x			dw 0
 .y			dw 0
 .max_x			dw 0
@@ -453,6 +461,9 @@ align 32
 ; Redraws all windows
 align 32
 wm_redraw:
+	cmp [wm_dirty], 1
+	jne .done
+
 	; lock the screen to improve performance!
 	call use_back_buffer
 	call lock_screen
@@ -495,10 +506,9 @@ align 32
 	mov ax, [.x]
 	mov bx, [.y]
 	mov si, [.width]
-	;mov di, [.height]
-	;add si, 8
-	;add di, 32
-	mov di, 24
+	mov di, [.height]
+	add si, [window_border_x_min]
+	add di, [window_border_y_min]
 	mov edx, [window_border]
 	mov cl, [window_opacity]
 	call alpha_fill_rect
@@ -517,8 +527,8 @@ align 32
 	mov esi, [.title]
 	mov cx, [.x]
 	mov dx, [.y]
-	add cx, 4+16+4
-	add dx, 4
+	add cx, [window_title_x]
+	add dx, [window_title_y]
 	call print_string_transparent
 
 	; the window frame buffer
@@ -526,19 +536,15 @@ align 32
 	mov bx, [.y]
 	mov si, [.width]
 	mov di, [.height]
-	;add ax, 4
-	add bx, 24
+	add ax, [window_canvas_x]
+	add bx, [window_canvas_y]
 	mov edx, [.framebuffer]
 	call blit_buffer_no_transparent
 
-	jmp .next
-
-align 32
 .next:
 	inc [.handle]
 	jmp .loop
 
-align 32
 .do_active_window:
 	cmp [active_window], -1
 	je .done
@@ -560,20 +566,12 @@ align 32
 	mov ax, [.x]
 	mov bx, [.y]
 	mov si, [.width]
-	;mov di, [.height]
-	;add si, 8
-	;add di, 32
-	mov di, 24
-	mov edx, [window_border]
+	mov di, [.height]
+	add si, [window_border_x_min]
+	add di, [window_border_y_min]
+	mov edx, [window_active_border]
 	mov cl, [window_opacity]
 	call alpha_fill_rect
-
-	mov ax, [.x]
-	mov bx, [.y]
-	mov si, [.width]
-	mov di, 2
-	mov edx, [window_header]
-	call fill_rect
 
 	; the close button
 	mov ax, [.x]
@@ -589,8 +587,8 @@ align 32
 	mov esi, [.title]
 	mov cx, [.x]
 	mov dx, [.y]
-	add cx, 4+16+4
-	add dx, 4
+	add cx, [window_title_x]
+	add dx, [window_title_y]
 	call print_string_transparent
 
 	; the window frame buffer
@@ -598,13 +596,14 @@ align 32
 	mov bx, [.y]
 	mov si, [.width]
 	mov di, [.height]
-	;add ax, 4
-	add bx, 24
+	add ax, [window_canvas_x]
+	add bx, [window_canvas_y]
 	mov edx, [.framebuffer]
 	call blit_buffer_no_transparent
 	jmp .done
 
 .done:
+	mov [wm_dirty], 0
 	call redraw_mouse	; this takes care of all the dirty work before actually drawing the cursor ;)
 	ret
 
@@ -633,9 +632,6 @@ wm_event:
 	test [mouse_old_data], MOUSE_LEFT_BTN
 	jnz .drag
 
-	jmp .click
-
-align 32
 .click:
 	; now we know the user just clicked on something
 	; if he clicked on the active window, send the window a click event
@@ -655,25 +651,33 @@ align 32
 	shl eax, 7
 	add eax, [window_handles]
 
-	;mov ecx, [mouse_y]
-	;mov dx, [eax+WINDOW_Y]
-	;add dx, 24
-	;cmp cx, dx
-	;jl .check_taskbar
+	mov ecx, [mouse_y]
+	mov dx, [eax+WINDOW_Y]
+	add dx, [window_border_y_min]
+
+	cmp cx, dx
+	jl .done
+
+	add dx, [eax+WINDOW_HEIGHT]
+	;add dx, [window_border_y_min]
+	cmp cx, dx
+	jg .done
 
 	or word[eax+WINDOW_EVENT], WM_LEFT_CLICK
+	mov [wm_dirty], 1
 
 	jmp .done
 
-align 32
 .set_focus:
 	call wm_detect_window
 	mov [active_window], eax
+	mov [wm_dirty], 1
 	jmp .done
 	;jmp .done
 
-align 32
 .drag:
+	mov [wm_dirty], 1
+
 	; if the user dragged something --
 	; -- we'll need to know if a window has been dragged --
 	; -- because we'll need to move the window to follow the mouse ;)
@@ -700,7 +704,6 @@ align 32
 	mov ebx, [mouse_y]
 	jmp .do_x
 
-align 32
 .do_x:
 	sub ax, cx
 	js .x_negative
@@ -727,7 +730,6 @@ align 32
 .x_zero:
 	mov word[esi+WINDOW_X], 0
 
-align 32
 .do_y:
 	sub bx, dx
 	js .y_negative
@@ -755,7 +757,6 @@ align 32
 	mov word[esi+WINDOW_Y], 0
 	jmp .done
 
-align 32
 .done:
 	call wm_redraw
 	ret
@@ -764,6 +765,7 @@ align 32
 	call redraw_mouse
 	ret
 
+align 8
 .handle			dd 0
 
 ; wm_read_event:

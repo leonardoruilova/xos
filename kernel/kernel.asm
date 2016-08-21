@@ -7,7 +7,7 @@ org 0x1000
 
 	jmp 0x0000:kmain16
 
-	kernel_version			db "xOS32 v0.06 (18 August 2016)",0
+	kernel_version			db "xOS32 v0.06 (20 August 2016)",0
 	copyright_str			db "Copyright (C) 2016 by Omar Mohammad, all rights reserved.",0
 	newline				db 10,0
 
@@ -108,7 +108,7 @@ kmain16:
 	out 0xA1, al
 
 	; wait for queued IRQs to be handled
-	mov ecx, 0xFFFF
+	mov ecx, 0xFF
 
 .pic_wait:
 	sti
@@ -198,6 +198,8 @@ kmain32:
 	mov edx, task1
 	call create_task_memory
 	mov edx, task2
+	call create_task_memory
+	mov edx, task3
 	call create_task_memory
 
 ; idle_process:
@@ -362,7 +364,60 @@ task2:
 
 .title			db "Hello world",0
 .text			db "Welcome to the Hello World ",10
-			db "application!",0
+			db "application!!!",0
+
+task3:
+	mov ebp, 0
+	mov ax, 8
+	mov bx, 8
+	mov si, 256
+	mov di, 256
+	mov dx, 0
+	mov ecx, .title
+	int 0x60
+
+.wait:
+	; wait for window event
+	mov ebp, 4
+	mov eax, 2
+	int 0x60
+
+	test ax, WM_LEFT_CLICK
+	jnz .got_event
+
+	mov ebp, 1
+	int 0x60
+	jmp .wait
+
+.got_event:
+	mov ebp, 5		; read mouse status
+	mov eax, 2
+	int 0x60
+
+	jcxz .check_zero
+	jmp .work
+
+.check_zero:
+	cmp dx, 0
+	je .wait
+
+.work:
+	mov ebp, 2		; get pixel offset
+	mov eax, 2
+	int 0x60
+
+	cmp eax, -1
+	je .wait
+
+	mov edi, eax
+	mov eax, 0
+	stosd
+	stosd
+	stosd
+	stosd
+	jmp .wait
+
+.title			db "Draw",0
 
 	;
 	; END OF KERNEL INITIALIZATION CODE
@@ -403,6 +458,7 @@ task2:
 	; Block Device Drivers
 	include "kernel/blkdev/blkdev.asm"	; Generic storage device interface
 	include "kernel/blkdev/ata.asm"		; ATA driver
+	include "kernel/blkdev/ahci.asm"	; AHCI driver
 
 	; Graphics
 	include "kernel/gui/gdi.asm"		; Graphics library

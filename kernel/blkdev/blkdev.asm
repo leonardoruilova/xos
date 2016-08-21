@@ -52,7 +52,7 @@ blkdev_init:
 
 	; detect devices ;)
 	call ata_detect
-	;call ahci_detect
+	call ahci_detect
 	;call usb_mass_detect
 
 	; determine the boot device

@@ -56,7 +56,8 @@ wm_read_mouse:
 	mov edx, [mouse_y]
 	sub cx, ax
 	sub dx, bx
-	sub dx, 24
+	sub cx, [window_canvas_x]
+	sub dx, [window_canvas_y]
 
 	test cx, 0x8000
 	jnz .error
@@ -93,6 +94,7 @@ wm_clear:
 	rep stosd
 
 .done:
+	mov [wm_dirty], 1
 	call wm_redraw
 	ret
 
@@ -234,6 +236,7 @@ wm_draw_text:
 	jmp .loop
 
 .done:
+	mov [wm_dirty], 1
 	call wm_redraw
 	ret
 

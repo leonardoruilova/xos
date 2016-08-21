@@ -391,4 +391,142 @@ pci_get_device_vendor:
 .device				db 0
 .function			db 0
 
+; pci_map_memory:
+; Maps PCI memory space in the virtual address space
+; In\	AL = Bus
+; In\	AH = Device
+; In\	BL = Function
+; In\	DL = BAR number (0 for BAR0, 1 for BAR1, etc...)
+; Out\	EAX = Address of memory in virtual address space, 0 on error
+; Out\	ECX = Bytes of memory used by PCI device
+
+pci_map_memory:
+	mov [.bus], al
+	mov [.dev], ah
+	mov [.function], bl
+
+	shl dl, 2		; mul 4
+	add dl, PCI_BAR0
+	mov [.reg], dl
+	mov bh, dl
+	call pci_read_dword
+	cmp eax, 0
+	je .quit_fail
+	mov [.data], eax
+
+	test eax, 1		; I/O space or memory?
+	jnz .quit_fail
+
+	; calculate size of the memory
+	mov al, [.bus]
+	mov ah, [.dev]
+	mov bl, [.function]
+	mov bh, [.reg]
+	mov edx, 0xFFFFFFFF	; request bar size
+	call pci_write_dword
+
+	call pci_read_dword
+	not eax
+	mov [.memory_size], eax
+
+	; replace original bar
+	mov al, [.bus]
+	mov ah, [.dev]
+	mov bl, [.function]
+	mov bh, [.reg]
+	mov edx, [.data]
+	call pci_write_dword
+
+	; grab some virtual memory
+	mov eax, KERNEL_HEAP
+	mov ecx, [.memory_size]
+	add ecx, 4095
+	shr ecx, 12		; bytes -> to pages
+	inc ecx
+	call vmm_alloc_pages
+	mov [.return], eax
+	cmp eax, 0
+	je .quit_fail
+
+	; map it
+	mov eax, [.return]
+	mov ebx, [.data]
+	and ebx, 0xFFFFF000	; force page alignment
+	mov ecx, [.memory_size]
+	add ecx, 4095
+	shr ecx, 12
+	inc ecx
+	mov dl, PAGE_PRESENT OR PAGE_WRITEABLE	; it's all a driver needs
+	call vmm_map_memory
+
+	mov eax, [.data]
+	and eax, 0xFF0		; memory space is always 16-byte aligned
+	add [.return], eax
+
+	mov esi, .done_msg
+	call kprint
+	mov al, [.bus]
+	call hex_byte_to_string
+	call kprint
+	mov esi, .colon
+	call kprint
+	mov al, [.dev]
+	call hex_byte_to_string
+	call kprint
+	mov esi, .colon
+	call kprint
+	mov al, [.function]
+	call hex_byte_to_string
+	call kprint
+	mov esi, .done_msg2
+	call kprint
+
+	mov eax, [.data]
+	and eax, 0xFFFFFFF0
+	call hex_dword_to_string
+	call kprint
+
+	mov esi, .done_msg3
+	call kprint
+	mov eax, [.return]
+	call hex_dword_to_string
+	call kprint
+
+	mov esi, .done_msg4
+	call kprint
+	mov eax, [.return]
+	add eax, [.memory_size]
+	call hex_dword_to_string
+	call kprint
+	mov esi, newline
+	call kprint
+
+	mov eax, [.return]
+	mov ecx, [.memory_size]
+	ret
+
+.quit_fail:
+	mov esi, .fail_msg
+	call kprint
+
+	xor eax, eax
+	xor ecx, ecx
+	ret
+
+.bus				db 0
+.dev				db 0
+.function			db 0
+.reg				db 0
+.data				dd 0
+.memory_size			dd 0
+.return				dd 0
+.fail_msg			db "Warning: unable to map PCI MMIO into virtual memory.",10,0
+.done_msg			db "PCI device ",0
+.colon				db ":",0
+.done_msg2			db " MMIO at 0x",0
+.done_msg3			db ", mapped at 0x",0
+.done_msg4			db " -> 0x",0
+
+
+
 

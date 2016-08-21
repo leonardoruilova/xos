@@ -925,21 +925,20 @@ align 8
 ; Out\	XMM0 = New color, 4 pixels
 align 64
 alpha_blend_colors_packed:
-	and edx, 0xF
-	mov dword[.intensity], edx
+	mov byte[.intensity], dl
 
 	movdqa xmm2, dqword[.mask]
 	andpd xmm0, xmm2
 	andpd xmm1, xmm2
 
-	psrlq xmm0, [.intensity]		; shift foreground by intensity
+	psrlq xmm0, [.intensity]	; shift foreground by intensity
 	psrlq xmm1, 1
 	paddq xmm0, xmm1
 
 	ret
 
-align 8
-.intensity			dq 0
+align 16
+.intensity:			times 2 dq 0
 align 16	; for sse...
 .mask				dq 0x00F0F0F000F0F0F0
 				dq 0x00F0F0F000F0F0F0
@@ -963,6 +962,7 @@ alpha_fill_rect:
 
 	mov [.x], ax
 	mov [.y], bx
+	shr si, 2		; div 4; because we'll work on 4 pixels at the same time
 	mov [.width], si
 	mov [.height], di
 	mov [.alpha], cl
@@ -983,7 +983,7 @@ alpha_fill_rect:
 .start:
 	mov edi, [.offset]
 	movzx ecx, [.width]
-	shr ecx, 2		; div 4, because we'll work on 4 pixels at a time
+	;shr ecx, 2		; div 4, because we'll work on 4 pixels at a time
 
 .loop:
 	movdqa xmm0, xmm3	; foreground
@@ -992,7 +992,7 @@ alpha_fill_rect:
 	call alpha_blend_colors_packed		; sse alpha blending
 
 	movdqu [edi], xmm0
-	add edi, 16
+	lea edi, [edi+16]
 	loop .loop
 
 .next_line:

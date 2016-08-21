@@ -425,7 +425,6 @@ ps2_mouse_irq:
 	mov [mouse_irq_state], dl
 	jmp .done
 
-align 32
 .data:
 	;test al, MOUSE_X_OVERFLOW OR MOUSE_Y_OVERFLOW
 	;jnz .done
@@ -434,13 +433,11 @@ align 32
 	inc [mouse_irq_state]
 	jmp .done
 
-align 32
 .x:
 	mov [mouse_packet.x], al
 	inc [mouse_irq_state]
 	jmp .done
 
-align 32
 .y:
 	mov [mouse_packet.y], al
 	xor dl, dl
@@ -453,12 +450,10 @@ align 32
 	call wm_event
 	jmp .done
 
-align 32
 .redraw:
 	call redraw_mouse
 	jmp .done
 
-align 32
 .done:
 	mov al, 0x20
 	out 0xa0, al
