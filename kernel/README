@@ -1,0 +1,14 @@
+This directory contains the source code of the xOS kernel: the core component of xOS.
+It is divided into subdirectories that are sorted out logically:
+
+  blkdev/     "BLocK DEVices", contains device drivers for storage devices, including ATA and AHCI.
+  firmware/   Contains firmware drivers, such as ACPI and PCI.
+  fonts/      Contains bitmap fonts for use by the kernel.
+  fs/         Contains low-level filesystem drivers.
+  gui/        Contains a minimal graphics library and event-driven windowing system.
+  iodev/      Contains device drivers for I/O devices, like the mouse and keyboard.
+  keymaps/    Contains scancode and ASCII character mapping tables.
+  mm/         Contains the low-level memory manager.
+  tasking/    Contains the scheduler, system calls and other multitasking things.
+  x86/        Contains things specific to x86, such as PIC, APIC, CPU modes, etc...
+  misc/       Contains things that don't fit into any category from the above.
