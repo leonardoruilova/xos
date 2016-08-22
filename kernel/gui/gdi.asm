@@ -144,8 +144,8 @@ put_pixel:
 ; Out\	Nothing
 align 32
 clear_screen:
-	mov [screen.x], 0
-	mov [screen.y], 0
+	;mov [screen.x], 0
+	;mov [screen.y], 0
 
 	mov edi, VBE_BACK_BUFFER
 	mov ecx, [screen.screen_size]
@@ -921,13 +921,14 @@ align 8
 ; Blends 4 colors in one SSE operation
 ; In\	XMM0 = Foreground, 4 pixels
 ; In\	XMM1 = Background, 4 pixels
+; In\	XMM2 = Color mask
 ; In\	DL = Intensity
 ; Out\	XMM0 = New color, 4 pixels
-align 64
+align 32
 alpha_blend_colors_packed:
 	mov byte[.intensity], dl
 
-	movdqa xmm2, dqword[.mask]
+	;movdqa xmm2, dqword[.mask]
 	andpd xmm0, xmm2
 	andpd xmm1, xmm2
 
@@ -939,9 +940,6 @@ alpha_blend_colors_packed:
 
 align 16
 .intensity:			times 2 dq 0
-align 16	; for sse...
-.mask				dq 0x00F0F0F000F0F0F0
-				dq 0x00F0F0F000F0F0F0
 
 ; alpha_fill_rect:
 ; Fills a rectangle with alpha blending, using SSE for acceleration
@@ -950,7 +948,7 @@ align 16	; for sse...
 ; In\	CL = Alpha intensity
 ; In\	EDX = Color
 ; Out\	Nothing
-align 64
+align 32
 alpha_fill_rect:
 	test si, 3		; must be multiple of 4, because the SSE function works on 4 pixels at a time
 	jnz alpha_fill_rect_no_sse
@@ -979,23 +977,28 @@ alpha_fill_rect:
 
 	mov [.current_line], 0
 	movdqa xmm3, dqword[.color]		; will use XMM3 to store the color
+	movdqa xmm2, dqword[.mask]		; and XMM2 for the mask
 
 .start:
+	test [.offset], 0x0F
+	jnz .unaligned_start
+
+.aligned_start:
 	mov edi, [.offset]
 	movzx ecx, [.width]
 	;shr ecx, 2		; div 4, because we'll work on 4 pixels at a time
 
-.loop:
+.aligned_loop:
 	movdqa xmm0, xmm3	; foreground
-	movdqu xmm1, [edi]	; background
+	movdqa xmm1, [edi]	; background
 	mov dl, [.alpha]
 	call alpha_blend_colors_packed		; sse alpha blending
 
-	movdqu [edi], xmm0
-	lea edi, [edi+16]
-	loop .loop
+	movdqa [edi], xmm0
+	add edi, 16
+	loop .aligned_loop
 
-.next_line:
+.aligned_next_line:
 	inc [.current_line]
 	mov cx, [.height]
 	cmp [.current_line], cx
@@ -1004,7 +1007,32 @@ alpha_fill_rect:
 	; next offset
 	mov edi, [screen.bytes_per_line]
 	add [.offset], edi
-	jmp .start
+	jmp .aligned_start
+
+.unaligned_start:
+	mov edi, [.offset]
+	movzx ecx, [.width]
+
+.unaligned_loop:
+	movdqa xmm0, xmm3	; foreground
+	movdqu xmm1, [edi]	; background
+	mov dl, [.alpha]
+	call alpha_blend_colors_packed		; sse alpha blending
+
+	movdqu [edi], xmm0
+	add edi, 16
+	loop .unaligned_loop
+
+.unaligned_next_line:
+	inc [.current_line]
+	mov cx, [.height]
+	cmp [.current_line], cx
+	jge .done
+
+	; next offset
+	mov edi, [screen.bytes_per_line]
+	add [.offset], edi
+	jmp .unaligned_start
 
 .done:
 	ret
@@ -1020,5 +1048,9 @@ align 16
 .color:			times 2 dq 0		; sse stuff ;)
 .offset			dd 0
 .current_line		dw 0
+align 16
+.mask			dq 0x00F0F0F000F0F0F0
+			dq 0x00F0F0F000F0F0F0
+
 
 

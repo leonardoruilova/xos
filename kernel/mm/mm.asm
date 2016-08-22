@@ -157,6 +157,9 @@ memcpy:
 	ret
 
 memcpy_u:
+	cmp ecx, 128
+	jl .normal
+
 	push ecx
 	shr ecx, 7		; div 128
 

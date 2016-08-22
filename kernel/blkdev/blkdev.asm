@@ -30,8 +30,6 @@ BLKDEV_UNPRESENT		= 0
 BLKDEV_ATA			= 1
 BLKDEV_AHCI			= 2
 BLKDEV_RAMDISK			= 3
-BLKDEV_ATAPI			= 4
-BLKDEV_SATAPI			= 5
 
 ; Device Content
 BLKDEV_FLAT			= 0
@@ -109,7 +107,7 @@ blkdev_init:
 	mov esi, .bootdev_msg
 	call kprint
 	mov eax, [boot_device]
-	call hex_dword_to_string
+	call int_to_string
 	call kprint
 	mov esi, newline
 	call kprint
@@ -125,8 +123,8 @@ blkdev_init:
 
 .tmp_buffer			dd 0
 .current_device			dd 0
-.bootdev_msg			db "Boot device is logical device 0x",0
-.no_bootdev_msg			db "Unable to determine the boot device.",0
+.bootdev_msg			db "Boot device is logical device ",0
+.no_bootdev_msg			db "Unable to determine the boot device.",10,0
 
 ; blkdev_register:
 ; Registers a device

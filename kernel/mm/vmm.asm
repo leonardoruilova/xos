@@ -81,6 +81,7 @@ vmm_init:
 
 vmm_map_memory:
 	pusha
+	and eax, 0xFFFFF000
 	mov [.virtual], eax
 	mov [.physical], ebx
 	mov [.count], ecx
@@ -126,6 +127,7 @@ vmm_map_memory:
 ; Out\	Nothing
 
 vmm_unmap_memory:
+	and eax, 0xFFFFF000
 	mov ebx, 0
 	mov dl, 0
 	call vmm_map_memory
@@ -138,6 +140,7 @@ vmm_unmap_memory:
 ; Out\	DL = Page flags
 
 vmm_get_page:
+	and eax, 0xFFFFF000
 	shr eax, 10
 	add eax, page_tables
 
