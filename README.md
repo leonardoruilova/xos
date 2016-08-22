@@ -2,8 +2,8 @@
 xOS is an operating system written for the PC entirely in assembly language. This results in faster execution, smaller program sizes and overall simplicity. The goal of xOS is to be fully functional, yet small and simple.  
 #Features
 xOS is still under early stages of development; although the following features are already implemented:
-* Read-only PCI IDE (ATA drives, not ATAPI.)
 * PCI and ACPI, with shutdown.
+* ATA and SATA hard disks.
 * Multitasking and userspace.
 * PS/2 keyboard and mouse.
 * True-color windowed graphical user interface.

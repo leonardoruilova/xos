@@ -215,8 +215,8 @@ blkdev_read:
 	cmp byte[ebx], BLKDEV_ATA
 	je .ata
 
-	;cmp byte[ebx], BLKDEV_AHCI
-	;je .ahci
+	cmp byte[ebx], BLKDEV_AHCI
+	je .ahci
 
 	;cmp byte[ebx], BLKDEV_RAMDISK
 	;je .ramdisk
@@ -226,6 +226,11 @@ blkdev_read:
 .ata:
 	mov bl, [ebx+BLKDEV_ADDRESS]
 	call ata_read
+	ret
+
+.ahci:
+	mov bl, [ebx+BLKDEV_ADDRESS]	; ahci port
+	call ahci_read
 	ret
 
 .fail:

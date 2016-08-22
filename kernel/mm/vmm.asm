@@ -7,9 +7,10 @@ use32
 page_directory			= 0x9C000
 page_tables			= 0x200000
 
-PAGE_PRESENT			= 1
-PAGE_WRITEABLE			= 2
-PAGE_USER			= 4
+PAGE_PRESENT			= 0x01
+PAGE_WRITEABLE			= 0x02
+PAGE_USER			= 0x04
+PAGE_NO_CACHE			= 0x10
 
 ; vmm_init:
 ; Initializes the virtual memory manager and paging subsystem

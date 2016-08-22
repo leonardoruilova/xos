@@ -456,7 +456,7 @@ pci_map_memory:
 	add ecx, 4095
 	shr ecx, 12
 	inc ecx
-	mov dl, PAGE_PRESENT OR PAGE_WRITEABLE	; it's all a driver needs
+	mov dl, PAGE_PRESENT OR PAGE_WRITEABLE OR PAGE_NO_CACHE	; it's all a driver needs
 	call vmm_map_memory
 
 	mov eax, [.data]
