@@ -1,0 +1,3 @@
+This directory contains the source code of the XFS file system utility. It is written in standard C and uses no special libraries. The binary 'xfs' is an x86_64 Linux binary built on Ubuntu 15.04. The script 'build.sh' should build it most anywhere that has the gcc compiler.
+Notice that this is just temporary, and someday I'll have a "real" file system.
+
