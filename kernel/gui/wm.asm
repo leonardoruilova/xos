@@ -55,18 +55,17 @@ WM_BUTTON			= 0x0008
 
 MAXIMUM_WINDOWS			= 16
 
-align 32
+align 4
 open_windows			dd 0
 active_window			dd -1
 window_handles			dd 0
 wm_background			dd 0
-align 32
 wm_running			db 0
 wm_dirty			db 1	; when set to 1, the WM needs a redraw
 
 ; Window Theme!
 ; TO-DO: Set these values from a theme file from the disk (i.e. make the gui customizable)
-align 32
+align 4
 wm_color			dd 0x00A2E8
 ;wm_color			dd 0x004288
 ;window_header			dd 0xE8A200
@@ -79,6 +78,8 @@ window_active_border		dd 0x000080
 window_close_color		dd 0xFF3030
 window_background		dd 0xFFFFFF
 window_opacity			db 0		; valid values are 0 to 4, 0 = opaque, 1 = less transparent, 4 = most transparent.
+
+align 4
 window_border_x_min		dw 8		; max x pos for a 0 width window
 window_border_y_min		dw 30		; max y pos for a 0 height window
 window_title_x			dw 24

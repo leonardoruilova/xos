@@ -38,7 +38,7 @@ mouse_speed			db 0		; 0 normal speed, 1 -> 4 fast speeds
 
 mouse_id			db 0
 
-align 16
+align 4
 mouse_data			dd 0
 mouse_x				dd 0
 mouse_y				dd 0
@@ -47,32 +47,24 @@ mouse_old_data			dd 0
 mouse_old_x			dd 0
 mouse_old_y			dd 0
 
+align 4
 ; these contain the initial x/y pos at the moment the button was pressed
 mouse_initial_x			dd 0
 mouse_initial_y			dd 0
 
-align 32
+align 4
 mouse_x_max			dd 0
-align 32
 mouse_y_max			dd 0
 
-align 16
 mouse_cursor			dd 0
-align 16
 mouse_width			dd 0
-align 16
 mouse_height			dd 0
-align 16
 mouse_visible			db 0
 
-align 32
 mouse_packet:
 	.data			db 0
-	align 32
 	.x			db 0
-	align 32
 	.y			db 0
-	align 32
 mouse_irq_state			db 0
 
 ; wait_ps2_write:

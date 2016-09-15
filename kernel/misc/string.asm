@@ -286,6 +286,29 @@ swap_string_order:
 	popa
 	ret
 
+; find_byte_in_string:
+; Find a byte within a string
+; In\	ESI = String
+; In\	DL = Byte to find
+; In\	ECX = Total bytes to search
+; Out\	EFLAGS.CF = 0 if byte found
+; Out\	ESI = Pointer to byte in string
+
+find_byte_in_string:
+
+.loop:
+	lodsb
+	cmp al, dl
+	je .found
+	loop .loop
+
+	stc
+	ret
+
+.found:
+	dec esi
+	clc
+	ret
 
 
 

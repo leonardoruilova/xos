@@ -35,10 +35,14 @@ BLKDEV_RAMDISK			= 3
 BLKDEV_FLAT			= 0
 BLKDEV_PARTITIONED		= 1
 
+; Default Disk I/O Buffer Size
+DISK_BUFFER_SIZE		= 65536		; 64 kb
+
 align 4
 blkdev_structure		dd 0
 blkdevs				dd 0	; number of block devices on the system
 boot_device			dd 0
+disk_buffer			dd 0
 
 ; blkdev_init:
 ; Detects and initializes block devices
@@ -111,6 +115,12 @@ blkdev_init:
 	call kprint
 	mov esi, newline
 	call kprint
+
+	; allocate a disk buffer for use by filesystem drivers
+	mov ecx, DISK_BUFFER_SIZE
+	;call malloc		; when userspace drivers actually exist, then i'll put this memory as userspace
+	call kmalloc
+	mov [disk_buffer], eax
 
 	; and fly!
 	mov eax, [.tmp_buffer]
@@ -194,6 +204,15 @@ blkdev_register:
 .ramdisk_msg		db "ramdisk device",0
 .undefined_msg		db "undefined device",0
 .msg2			db ", device number ",0
+
+; blkdev_get_buffer:
+; Returns a pointer to the disk buffer -- for use by userspace drivers in the future
+; In\	Nothing
+; Out\	EAX = Pointer to disk buffer
+
+blkdev_get_buffer:
+	mov eax, [disk_buffer]
+	ret
 
 ; blkdev_read:
 ; Reads from a block device
