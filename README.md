@@ -1,4 +1,4 @@
-![xOS showing CPU usage, a test application, and transparent windows.](https://s4.postimg.org/dr7r06ugt/transparency.png)  
+![Window Manager Demo](https://s17.postimg.org/beavinuq7/wallpaper.png)  
 xOS is an operating system written for the PC entirely in assembly language. This results in faster execution, smaller program sizes and overall simplicity. The goal of xOS is to be fully functional, yet small and simple.  
 #Features
 xOS is still under early stages of development; although the following features are already implemented:
