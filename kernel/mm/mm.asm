@@ -121,6 +121,15 @@ memcpy:
 	shr ecx, 7		; div 128
 
 .loop:
+	prefetchnta [esi+0x80]
+	prefetchnta [esi+0x90]
+	prefetchnta [esi+0xA0]
+	prefetchnta [esi+0xB0]
+	prefetchnta [esi+0xC0]
+	prefetchnta [esi+0xD0]
+	prefetchnta [esi+0xE0]
+	prefetchnta [esi+0xF0]
+
 	movdqa xmm0, [esi]
 	movdqa xmm1, [esi+0x10]
 	movdqa xmm2, [esi+0x20]
@@ -141,7 +150,8 @@ memcpy:
 
 	add esi, 128
 	add edi, 128
-	loop .loop
+	dec ecx
+	jnz .loop
 
 	pop ecx
 
@@ -164,6 +174,15 @@ memcpy_u:
 	shr ecx, 7		; div 128
 
 .loop:
+	prefetchnta [esi+0x80]
+	prefetchnta [esi+0x90]
+	prefetchnta [esi+0xA0]
+	prefetchnta [esi+0xB0]
+	prefetchnta [esi+0xC0]
+	prefetchnta [esi+0xD0]
+	prefetchnta [esi+0xE0]
+	prefetchnta [esi+0xF0]
+
 	movdqu xmm0, [esi]
 	movdqu xmm1, [esi+0x10]
 	movdqu xmm2, [esi+0x20]
@@ -184,7 +203,8 @@ memcpy_u:
 
 	add esi, 128
 	add edi, 128
-	loop .loop
+	dec ecx
+	jnz .loop
 
 	pop ecx
 

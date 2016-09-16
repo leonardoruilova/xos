@@ -155,7 +155,7 @@ xfs_open:
 .permission		dd 0
 .file_entry		dd 0
 .handle			dd 0
-.msg			db "Opened file '",0
+.msg			db "xfs: opened file '",0
 .msg2			db "', file handle ",0
 
 ; xfs_close:
@@ -164,7 +164,18 @@ xfs_open:
 ; Out\	Nothing
 
 xfs_close:
+	mov [.handle], eax
+
+	mov esi, .msg
+	call kprint
+	mov eax, [.handle]
+	call int_to_string
+	call kprint
+	mov esi, newline
+	call kprint
+
 	; just clear the entire file handle ;)
+	mov eax, [.handle]
 	shl eax, 5		; mul 32
 	add eax, [file_handles]
 	mov edi, eax
@@ -173,6 +184,9 @@ xfs_close:
 	rep movsb
 
 	ret
+
+.handle			dd 0
+.msg			db "xfs: close file handle ",0
 
 ; xfs_seek:
 ; Moves position in file stream
@@ -611,6 +625,8 @@ xfs_external_filename:
 ; Out\	EAX = Pointer to file entry, -1 on error
 
 xfs_get_entry:
+	mov [.filename], esi
+
 	call xfs_internal_filename
 	cmp eax, 0
 	jne .error
@@ -625,26 +641,40 @@ xfs_get_entry:
 	add esi, 32
 
 .loop:
+	push esi
+
 	mov edi, xfs_new_filename
 	mov ecx, 11
 	rep cmpsb
 	je .found
 
-	add esi, 32-11
+	pop esi
+	add esi, 32
+
 	inc [.current_entry]
 	cmp [.current_entry], XFS_ROOT_ENTRIES
 	jge .error
 	jmp .loop
 
 .found:
-	sub esi, 11
-	mov eax, esi
+	pop eax
 	ret
 
 .error:
+	mov esi, .fail_msg
+	call kprint
+	mov esi, [.filename]
+	call kprint
+	mov esi, .fail_msg2
+	call kprint
+
 	mov eax, -1
 	ret
 
 .current_entry			dd 0
+.filename			dd 0
+.fail_msg			db "xfs: file '",0
+.fail_msg2			db "' not found.",10,0
+
 
 

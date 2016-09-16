@@ -244,12 +244,52 @@ blkdev_read:
 
 .ata:
 	mov bl, [ebx+BLKDEV_ADDRESS]
+	mov [.ata_drive], bl
+	mov [.count], ecx
+	mov [.buffer], edi
+	mov dword[.lba], eax
+	mov dword[.lba+4], edx
+
+.ata_loop:
+	cmp [.count], 255
+	jg .ata_big
+
+	cmp [.count], 0
+	je .done
+
+	mov edx, dword[.lba+4]
+	mov eax, dword[.lba]
+	mov bl, [.ata_drive]
+	mov ecx, [.count]
+	mov edi, [.buffer]
 	call ata_read
-	ret
+	cmp al, 1
+	je .fail
+
+	jmp .done
+
+.ata_big:
+	mov edx, dword[.lba+4]
+	mov eax, dword[.lba]
+	mov bl, [.ata_drive]
+	mov ecx, 255
+	mov edi, [.buffer]
+	call ata_read
+	cmp al, 1
+	je .fail
+
+	sub [.count], 255
+	add [.buffer], 255*512
+	add dword[.lba], 255
+	jmp .ata_loop
 
 .ahci:
 	mov bl, [ebx+BLKDEV_ADDRESS]	; ahci port
 	call ahci_read
+	ret
+
+.done:
+	mov al, 0
 	ret
 
 .fail:
@@ -257,6 +297,10 @@ blkdev_read:
 	mov ah, -1
 	ret
 
+.ata_drive		db 0
+.buffer			dd 0
+.count			dd 0
+.lba			dq 0
 
 
 

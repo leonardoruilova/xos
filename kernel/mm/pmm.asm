@@ -227,16 +227,13 @@ pmm_alloc:
 	ret
 
 .no:
-	mov esi, .no_msg
-	call kprint
-
-	mov eax, 0
-	ret
+	push .no_msg
+	jmp panic
 
 .address			dd 0
 .count				dd 0
 .free_pages			dd 0
-.no_msg				db "Out of physical memory; returning null.",10,0
+.no_msg				db "Out of physical memory.",0
 
 ; pmm_free:
 ; Frees physical memory

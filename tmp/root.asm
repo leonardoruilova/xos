@@ -14,3 +14,18 @@ date				db 5
 				dw 2016
 reserved2			dw 0
 
+
+wp1:
+
+.filename			db "wp1     bmp"		; 0
+.reserved1			db 0				; 11
+.lba_sector			dd 1000				; 12
+.size_sectors			dd 2813				; 16
+.size_bytes			dd 1440138			; 20
+.time				db 0
+				db 0
+.date				db 5
+				db 1
+				dw 2016
+.reserved2			dw 0
+

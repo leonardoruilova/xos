@@ -227,11 +227,55 @@ exception_handler:
 
 	call dump_regs
 
-	jmp $
+	cli
+	hlt
 
 .msg			db "KERNEL PANIC: ",0
 .msg2			db "Error code: 0x",0
 .msg3			db ", fault address: 0x",0
+
+; panic:
+; Makes a kernel panic
+
+panic:
+	call save_regs
+	call use_front_buffer
+
+	mov [debug_mode], 1
+
+	mov ebx, 0
+	call clear_screen
+
+	push cs
+	pop eax
+	mov [dump_cs], ax
+
+	pushfd
+	pop eax
+	mov [dump_eflags], eax
+
+	cli
+
+	mov eax, esp
+	mov [dump_esp], eax
+
+	mov ax, ss
+	mov [dump_ss], ax
+
+	mov esi, .msg
+	call kprint
+
+	pop esi
+	call kprint
+	mov esi, newline
+	call kprint
+
+	call dump_regs
+
+	cli
+	hlt
+
+.msg			db "KERNEL PANIC: ",0
 
 ; save_regs:
 ; Saves registers for dumping

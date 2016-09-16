@@ -66,7 +66,7 @@ wm_dirty			db 1	; when set to 1, the WM needs a redraw
 ; Window Theme!
 ; TO-DO: Set these values from a theme file from the disk (i.e. make the gui customizable)
 align 4
-wm_color			dd 0x00A2E8
+wm_color			dd 0x00B0B0
 ;wm_color			dd 0x004288
 ;window_header			dd 0xE8A200
 window_header			dd 0x808080
@@ -74,7 +74,7 @@ window_title			dd 0xD8D8D8
 window_inactive_title		dd 0x000000
 window_border			dd 0xD8D8D8
 ;window_active_border		dd 0x707070
-window_active_border		dd 0x000080
+window_active_border		dd 0x404040
 window_close_color		dd 0xFF3030
 window_background		dd 0xFFFFFF
 window_opacity			db 0		; valid values are 0 to 4, 0 = opaque, 1 = less transparent, 4 = most transparent.
@@ -86,6 +86,13 @@ window_title_x			dw 24
 window_title_y			dw 4
 window_canvas_x			dw 4
 window_canvas_y			dw 24
+
+default_wallpaper		db "wp1.bmp",0	; file to use as wallpaper
+
+wm_wallpaper			dd 0		; pointer to raw pixel buffer
+wm_wallpaper_size		dd 0		; size of raw pixel buffer
+wm_wallpaper_width		dw 0
+wm_wallpaper_height		dw 0
 
 ; wm_init:
 ; Initializes the window manager
@@ -113,10 +120,87 @@ wm_init:
 	mov [wm_running], 1
 	sti
 	call wm_redraw
+
+	; open the wallpaper with read access
+	mov esi, default_wallpaper
+	mov edx, FILE_READ
+	call xfs_open
+
+	cmp eax, -1
+	je .no_wallpaper
+	mov [.file_handle], eax
+
+	; get file size
+	mov eax, [.file_handle]
+	mov ebx, SEEK_END
+	mov ecx, 0
+	call xfs_seek
+	cmp eax, 0
+	jne .no_wallpaper
+
+	mov eax, [.file_handle]
+	call xfs_tell
+	cmp eax, 0		; empty file?
+	je .no_wallpaper
+
+	mov [.wp_size], eax
+
+	; back to the beginning of the file
+	mov eax, [.file_handle]
+	mov ebx, SEEK_SET
+	mov ecx, 0
+	call xfs_seek
+	cmp eax, 0
+	jne .no_wallpaper
+
+	; allocate memory and read the file
+	mov ecx, [.wp_size]
+	call kmalloc
+	mov [.tmp_memory], eax
+
+	; for now, fixed size is 800x600
+	mov ecx, 800*600*4
+	call kmalloc
+	mov [wm_wallpaper], eax
+
+	; read the file
+	mov eax, [.file_handle]
+	mov ecx, [.wp_size]
+	mov edi, [.tmp_memory]
+	call xfs_read
+	cmp eax, [.wp_size]
+	jne .no_wallpaper
+
+	mov eax, [.file_handle]
+	call xfs_close
+
+	mov edx, [.tmp_memory]
+	mov ebx, [wm_wallpaper]
+	call decode_bmp
+	cmp ecx, -1
+	je .no_wallpaper
+
+	mov [wm_wallpaper_size], ecx
+	mov [wm_wallpaper_width], si
+	mov [wm_wallpaper_height], di
+
+	mov eax, [.tmp_memory]
+	call kfree
+
+	ret
+
+.no_wallpaper:
+	mov esi, .no_wp
+	call kprint
+
+	mov [wm_wallpaper], 0
 	ret
 
 .msg			db "Start windowing system...",10,0
-.title			db "Test Window",0
+.no_wp			db "Unable to use wallpaper; using solid color background.",10,0
+.file_handle		dd 0
+.wp_size		dd 0
+.tmp_memory		dd 0
 
 ; wm_find_handle:
 ; Finds a free window handle
@@ -472,6 +556,17 @@ wm_redraw:
 	mov ebx, [wm_color]
 	call clear_screen
 
+	cmp [wm_wallpaper], 0
+	je .start_windows
+
+	mov ax, 0
+	mov bx, 0
+	mov si, [wm_wallpaper_width]
+	mov di, [wm_wallpaper_height]
+	mov edx, [wm_wallpaper]
+	call blit_buffer_no_transparent
+
+.start_windows:
 	; now move on to the windows
 	xor eax, eax
 	mov [.handle], eax

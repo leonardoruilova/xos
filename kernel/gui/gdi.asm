@@ -7,13 +7,10 @@ use32
 ; xOS GDI -- An internal graphics library used by the xOS Kernel
 ; Should be easy to port to other systems
 
-align 16
 is_redraw_enabled		db 1
-align 32
+align 4
 text_background			dd 0x000000
-align 32
 text_foreground			dd 0xFFFFFF
-align 32
 system_font			dd font
 current_buffer			db 0		; 0 if the system is using the back buffer
 						; 1 if it's using the hardware buffer
@@ -32,8 +29,17 @@ redraw_screen:
 	mov ecx, [screen.screen_size_dqwords]
 	jmp .loop
 
-align 32
+align 64
 .loop:
+	prefetchnta [esi+0x80]
+	prefetchnta [esi+0x90]
+	prefetchnta [esi+0xA0]
+	prefetchnta [esi+0xB0]
+	prefetchnta [esi+0xC0]
+	prefetchnta [esi+0xD0]
+	prefetchnta [esi+0xE0]
+	prefetchnta [esi+0xF0]
+
 	movdqa xmm0, [esi]
 	movdqa xmm1, [esi+0x10]
 	movdqa xmm2, [esi+0x20]
@@ -54,7 +60,8 @@ align 32
 
 	add esi, 128
 	add edi, 128
-	loop .loop
+	dec ecx
+	jnz .loop
 
 .quit:
 	ret
