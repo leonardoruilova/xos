@@ -192,6 +192,10 @@ exception_handler:
 	mov ebx, 0
 	call clear_screen
 
+	mov ebx, 0
+	mov ecx, 0xFFFFFF
+	call set_text_color
+
 	mov eax, [esp+16]	; CS
 	mov [dump_cs], ax
 
@@ -245,6 +249,10 @@ panic:
 
 	mov ebx, 0
 	call clear_screen
+
+	mov ebx, 0
+	mov ecx, 0xFFFFFF
+	call set_text_color
 
 	push cs
 	pop eax

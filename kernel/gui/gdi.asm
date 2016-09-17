@@ -603,7 +603,9 @@ blit_buffer:
 	mov edi, [.offset]
 	movzx ecx, [.width]
 	mov edx, [.transparent]
+	jmp .loop
 
+align 64
 .loop:
 	lodsd
 	cmp eax, edx
@@ -633,7 +635,7 @@ blit_buffer:
 	call redraw_screen
 	ret
 
-align 32
+align 4
 .transparent			dd 0
 .x				dw 0
 .y				dw 0
@@ -641,7 +643,7 @@ align 32
 .height				dw 0
 .end_x				dw 0
 .end_y				dw 0
-align 32
+align 4
 .buffer				dd 0
 .offset				dd 0
 .current_line			dd 0
@@ -925,12 +927,15 @@ align 8
 ;
 
 ; alpha_blend_colors_packed:
-; Blends 4 colors in one SSE operation
-; In\	XMM0 = Foreground, 4 pixels
-; In\	XMM1 = Background, 4 pixels
+; Blends 8 colors in one SSE operation
+; In\	XMM0 = Foreground 1, 4 pixels
+; In\	XMM1 = Background 1, 4 pixels
 ; In\	XMM2 = Color mask
+; In\	XMM6 = Foreground 2, 4 pixels
+; In\	XMM7 = Background 2, 4 pixels
 ; In\	DL = Intensity
 ; Out\	XMM0 = New color, 4 pixels
+; Out\	XMM6 = New color, 4 pixels
 align 32
 alpha_blend_colors_packed:
 	mov byte[.intensity], dl
@@ -938,15 +943,20 @@ alpha_blend_colors_packed:
 	;movdqa xmm2, dqword[.mask]
 	andpd xmm0, xmm2
 	andpd xmm1, xmm2
+	andpd xmm6, xmm2
+	andpd xmm7, xmm2
 
 	psrlq xmm0, [.intensity]	; shift foreground by intensity
+	psrlq xmm6, [.intensity]
 	psrlq xmm1, 1
+	psrlq xmm7, 1
 	paddq xmm0, xmm1
+	paddq xmm6, xmm7
 
 	ret
 
-align 16
-.intensity:			times 2 dq 0
+align 8
+.intensity:			dq 0
 
 ; alpha_fill_rect:
 ; Fills a rectangle with alpha blending, using SSE for acceleration
@@ -957,7 +967,7 @@ align 16
 ; Out\	Nothing
 align 32
 alpha_fill_rect:
-	test si, 3		; must be multiple of 4, because the SSE function works on 4 pixels at a time
+	test si, 7		; must be multiple of 8, because the SSE function works on 8 pixels at a time
 	jnz alpha_fill_rect_no_sse
 
 	cmp cl, 1
@@ -967,7 +977,7 @@ alpha_fill_rect:
 
 	mov [.x], ax
 	mov [.y], bx
-	shr si, 2		; div 4; because we'll work on 4 pixels at the same time
+	shr si, 3		; div 8; because we'll work on 8 pixels at the same time
 	mov [.width], si
 	mov [.height], di
 	mov [.alpha], cl
@@ -993,16 +1003,21 @@ alpha_fill_rect:
 .aligned_start:
 	mov edi, [.offset]
 	movzx ecx, [.width]
-	;shr ecx, 2		; div 4, because we'll work on 4 pixels at a time
 
 .aligned_loop:
+	prefetchnta [edi+16]
+	prefetchnta [edi+32]
+
 	movdqa xmm0, xmm3	; foreground
 	movdqa xmm1, [edi]	; background
+	movdqa xmm6, xmm3
+	movdqa xmm7, [edi+16]
 	mov dl, [.alpha]
 	call alpha_blend_colors_packed		; sse alpha blending
 
 	movdqa [edi], xmm0
-	add edi, 16
+	movdqa [edi+16], xmm6
+	add edi, 32
 	loop .aligned_loop
 
 .aligned_next_line:
@@ -1021,13 +1036,18 @@ alpha_fill_rect:
 	movzx ecx, [.width]
 
 .unaligned_loop:
+	prefetchnta [edi+16]
+
 	movdqa xmm0, xmm3	; foreground
 	movdqu xmm1, [edi]	; background
+	movdqa xmm6, xmm3
+	movdqu xmm7, [edi+16]
 	mov dl, [.alpha]
 	call alpha_blend_colors_packed		; sse alpha blending
 
 	movdqu [edi], xmm0
-	add edi, 16
+	movdqu [edi+16], xmm6
+	add edi, 32
 	loop .unaligned_loop
 
 .unaligned_next_line:

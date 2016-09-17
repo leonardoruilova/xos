@@ -881,8 +881,6 @@ wm_read_event:
 	mov edi, eax
 	mov ax, [edi+WINDOW_EVENT]	; return the event data
 	mov word[edi+WINDOW_EVENT], 0
-	and eax, 0xFFFF			; because the high bits of eax will contain memory locations in the kernel heap
-					; although the kernel heap is not accessible to ring 3, this probably doesn't hurt
 	ret
 
 .no:

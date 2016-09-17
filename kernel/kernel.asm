@@ -167,7 +167,7 @@ kmain32:
 	mov [screen.screen_size], eax
 	shr eax, 7
 	mov [screen.screen_size_dqwords], eax
-	call use_back_buffer
+	call use_front_buffer
 	call unlock_screen
 
 	; set IOPL to zero and reset all flags
@@ -483,8 +483,8 @@ task3:
 
 	; Default mouse cursor
 	cursor:
-	file "kernel/gui/themes/cursor_black.bmp"	; choose whichever cursor you like
-	;file "kernel/gui/themes/cursor_white.bmp"	; or even make your own; in Paint and GIMP use a 24-bit bitmap
+	;file "kernel/gui/themes/cursor_black.bmp"	; choose whichever cursor you like
+	file "kernel/gui/themes/cursor_white.bmp"	; or even make your own; in Paint and GIMP use a 24-bit bitmap
 	; Default bitmap font
 	font:
 	file "kernel/fonts/alotware.bin"

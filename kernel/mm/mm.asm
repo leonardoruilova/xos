@@ -119,7 +119,9 @@ memcpy:
 
 	push ecx
 	shr ecx, 7		; div 128
+	jmp .loop
 
+align 64
 .loop:
 	prefetchnta [esi+0x80]
 	prefetchnta [esi+0x90]
@@ -166,13 +168,16 @@ memcpy:
 
 	ret
 
+align 32
 memcpy_u:
 	cmp ecx, 128
 	jl .normal
 
 	push ecx
 	shr ecx, 7		; div 128
+	jmp .loop
 
+align 64
 .loop:
 	prefetchnta [esi+0x80]
 	prefetchnta [esi+0x90]
