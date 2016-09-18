@@ -143,11 +143,11 @@ ata_detect:
 
 	; setup the ATA IRQ stuff
 	mov al, 14+IRQ_BASE
-	mov ebp, ata_irq
+	mov ebp, ata_irq_primary
 	call install_isr
 
 	mov al, 15+IRQ_BASE
-	mov ebp, ata_irq
+	mov ebp, ata_irq_secondary
 	call install_isr
 
 	mov al, 14
@@ -377,10 +377,24 @@ ata_identify:
 .quote			db "'",0
 .no_msg			db "not present.",10,0
 
-; ata_irq:
-; ATA IRQ Handler
+; ata_irq_primary:
+; ATA Primary Channel IRQ Handler
 
-ata_irq:
+ata_irq_primary:
+	push eax
+	mov [.happened], 1
+	mov al, 0x20
+	out 0xA0, al
+	out 0x20, al
+	pop eax
+	iret
+
+.happened		db 0
+
+; ata_irq_secondary:
+; ATA Secondary Channel IRQ Handler
+
+ata_irq_secondary:
 	push eax
 
 	; first check if it's a spurious irq

@@ -77,7 +77,7 @@ window_border			dd 0xD8D8D8
 window_active_border		dd 0x404040
 window_close_color		dd 0xFF3030
 window_background		dd 0xFFFFFF
-window_opacity			db 0		; valid values are 0 to 4, 0 = opaque, 1 = less transparent, 4 = most transparent.
+window_opacity			db 1		; valid values are 0 to 4, 0 = opaque, 1 = less transparent, 4 = most transparent.
 
 align 4
 window_border_x_min		dw 8		; max x pos for a 0 width window
