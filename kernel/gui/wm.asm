@@ -187,6 +187,8 @@ wm_init:
 	mov eax, [.tmp_memory]
 	call kfree
 
+	mov [wm_dirty], 1
+	call wm_redraw
 	ret
 
 .no_wallpaper:
@@ -350,6 +352,8 @@ wm_make_handle:
 ; Out\	EAX = Window handle, -1 on error
 align 32
 wm_create_window:
+	cli		; sensitive area of code
+
 	cmp [open_windows], MAXIMUM_WINDOWS
 	jge .no
 
