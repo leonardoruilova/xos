@@ -4,6 +4,11 @@
 
 use32
 
+;
+; This file contains an AML interpreter.
+; The AML interpreter is still incomplete, but can write to OpRegions and parse packages.
+;
+
 ; AML Opcodes
 AML_OPCODE_ZERO			= 0x00
 AML_OPCODE_ONE			= 0x01
@@ -542,6 +547,8 @@ acpi_get_package_internal:
 	mov ebx, [.original_scope]
 	call acpi_execute_method
 
+	cmp ebx, -1
+	je .no
 	cmp eax, -1
 	je .no
 	cmp ecx, 1
@@ -951,6 +958,8 @@ acpi_execute_method:
 	mov esi, newline
 	call kprint
 
+	mov eax, -1
+	mov edx, -1
 	mov ebx, -1
 	ret
 

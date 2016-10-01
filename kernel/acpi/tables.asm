@@ -7,10 +7,9 @@ use32
 ;
 ; This file contains ACPI table routines.
 ; These include detecting ACPI at all, finding tables, and enabling ACPI using the SMI IO port in the FADT.
-; For ACPI runtime (AML, DSDT, shutdown, etc...), see "acpirun.asm" instead.
 ;
 
-ACPI_SDT_SIZE		= 36	; size of acpi sdt header
+ACPI_SDT_SIZE			= 36	; size of acpi sdt header
 
 ; ACPI Event Data
 ACPI_EVENT_TIMER		= 1
