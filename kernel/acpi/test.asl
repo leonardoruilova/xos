@@ -1,5 +1,5 @@
 
-DefinitionBlock ("test.bin", "DSDT", 1, "LENOVO", "CB-01   ", 0x00000001)
+DefinitionBlock ("test.aml", "DSDT", 1, "LENOVO", "CB-01   ", 0x00000001)
 {
 	Scope(_SB)
 	{
@@ -31,20 +31,26 @@ DefinitionBlock ("test.bin", "DSDT", 1, "LENOVO", "CB-01   ", 0x00000001)
 			
 			Return(0xFA6)
 		}
-
-		Method(_S5, 0, Serialized)
-		{
-			Name(S5PK, Package(4)
-			{
-				0,
-				0,
-				0,
-				0
-			})
-
-			Return(S5PK)
-		}
 	}
+
+	// For testing returning packages and package parsing
+	Method(_S4_, 0, Serialized)
+	{
+		Return(Package(4)
+		{
+			4,1,0,0
+		})
+	}
+
+	Method(_S5_, 0, Serialized)
+	{
+		Name(S5PK, Package(4)
+		{
+			0,0,0,0
+		})
+		Return(S5PK)
+	}
+
 }
 
 

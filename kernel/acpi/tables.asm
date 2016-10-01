@@ -192,7 +192,7 @@ enable_acpi:
 	; check if ACPI is enabled
 	mov edx, [acpi_fadt.pm1a_control_block]
 	in ax, dx
-	test ax, 1
+	test ax, ACPI_ENABLED
 	jnz .already_enabled
 
 	mov esi, .enabling
@@ -208,7 +208,7 @@ enable_acpi:
 .acpi_wait:
 	mov edx, [acpi_fadt.pm1a_control_block]
 	in ax, dx
-	test ax, 1
+	test ax, ACPI_ENABLED
 	jz .acpi_wait
 
 .already_enabled:

@@ -7,7 +7,7 @@ org 0x1000
 
 	jmp 0x0000:kmain16
 
-	kernel_version			db "xOS32 v0.06 (22 August 2016)",0
+	kernel_version			db "xOS32 v0.06 (1 October 2016)",0
 	copyright_str			db "Copyright (C) 2016 by Omar Mohammad, all rights reserved.",0
 	newline				db 10,0
 
@@ -201,6 +201,9 @@ kmain32:
 	call wm_init
 	call use_back_buffer
 	call unlock_screen
+
+	mov al, 5
+	call acpi_sleep
 
 	; for testing
 	mov edx, task1
@@ -449,6 +452,7 @@ task3:
 	; ACPI
 	include "kernel/acpi/tables.asm"	; ACPI table functions
 	include "kernel/acpi/aml.asm"		; ACPI AML functions
+	include "kernel/acpi/sleep.asm"		; ACPI sleeping code
 
 	; Miscellaneous Stuff
 	include "kernel/misc/kprint.asm"	; debugging stuff

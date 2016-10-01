@@ -266,7 +266,7 @@ acpi_get_scope:
 	jmp .loop
 
 .check_scope:
-	; test how many package bytes
+	; test how many package size bytes
 	mov [.return], esi
 
 	mov al, [esi]
@@ -327,17 +327,27 @@ acpi_get_scope:
 
 acpi_get_method:
 	mov [.method_str], eax
-	mov [.return], ebx		; scope
 
+	cmp ebx, 0
+	je .no_scope
+
+	mov [.return], ebx		; scope
 	mov esi, ebx
 	inc esi
 	call acpi_parse_size	; size of scope
 	add eax, [.return]
 	mov [.end_scope], eax
+	jmp .start
 
+.no_scope:
+	mov ebx, [aml_code]
+	mov [.return], ebx
+	add ebx, [aml_code_size]
+	mov [.end_scope], ebx
+
+.start:
 	; scan the scope for the method opcode
 	; then skip over the package size and scan for the name demanded
-
 	mov esi, [.return]
 	mov edi, [.end_scope]
 
@@ -405,8 +415,10 @@ acpi_get_method:
 ; Detects the ACPI system bus
 
 acpi_detect_sb:
-	mov [aml_code], test_aml+ACPI_SDT_SIZE
-	mov [aml_code_size], end_of_test_aml - test_aml - ACPI_SDT_SIZE
+	; Uncomment the following two lines if you want to experiment with your own ACPI code ;)
+	; When commented, the "real" firmware AML is used instead of my test code
+	;mov [aml_code], test_aml+ACPI_SDT_SIZE
+	;mov [aml_code_size], end_of_test_aml - test_aml - ACPI_SDT_SIZE
 
 	mov eax, "_SB_"
 	call acpi_get_scope
@@ -415,21 +427,324 @@ acpi_detect_sb:
 	mov [aml_system_bus], eax
 	mov [aml_system_bus_size], eax
 
-	mov eax, "WRTT"
-	mov ebx, [aml_system_bus]
-	call acpi_get_method
-
-	mov ebx, [aml_system_bus]
-	call acpi_execute_method
-
-	cli
-	hlt
+	ret
 
 .error:
 	mov esi, .error_msg
 	jmp early_boot_error
 
 .error_msg		db "Failed to find the ACPI System Bus.",0
+
+; acpi_get_package:
+; Returns a pointer to a package
+; In\	EAX = 4-byte name
+; In\	EBX = Scope
+; Out\	EAX = Pointer to package, -1 on error
+
+acpi_get_package:
+	mov [.name], eax
+	mov [.scope], ebx
+
+	call acpi_get_package_internal
+
+	cmp eax, -1
+	je .error
+	cmp bl, 0
+	je .done
+
+	mov ebx, [.scope]
+	call acpi_get_package_internal
+
+.done:
+	push eax
+
+	mov esi, .msg
+	call kprint
+	mov esi, .name
+	call kprint
+	mov esi, newline
+	call kprint
+
+	pop eax
+	ret
+
+.error:
+	mov eax, -1
+	ret
+
+.name			dd 0
+			db 0
+.msg			db "acpi: found package ",0
+.scope			dd 0
+
+; acpi_get_package_internal:
+; Returns a package (internal routine)
+; In\	EAX = 4-byte name
+; In\	EBX = Scope
+; Out\	EAX = Package data, -1 on error
+; Out\	BL = 0 if EAX is a pointer, 1 if EAX is a name
+
+acpi_get_package_internal:
+	mov dword[.package_name+1], eax
+	mov [.original_scope], ebx
+	cmp ebx, 0
+	je .no_scope
+
+	mov [.scope], ebx
+	mov esi, ebx
+	inc esi
+	call acpi_parse_size
+	mov [.end_scope], eax
+	mov eax, [.scope]
+	add [.end_scope], eax
+	jmp .start
+
+.no_scope:
+	mov eax, [aml_code]
+	mov [.scope], eax
+	mov [.end_scope], eax
+	mov eax, [aml_code_size]
+	add [.end_scope], eax
+
+.start:
+	mov esi, [.scope]
+
+.loop:
+	push esi
+	mov edi, .package_name
+	mov ecx, 6
+	rep cmpsb
+	pop esi
+	je .found
+
+	inc esi
+	cmp esi, [.end_scope]
+	jge .try_method
+
+	jmp .loop 
+
+.found:
+	mov eax, esi
+	add eax, 5
+	mov bl, 0
+	ret
+
+.try_method:
+	; search for a method if the package doesn't exist...
+	; and then execute the method and assume the return value is a package
+	mov eax, dword[.package_name+1]
+	mov ebx, [.original_scope]
+	call acpi_get_method
+
+	cmp eax, -1
+	je .no
+
+	mov ebx, [.original_scope]
+	call acpi_execute_method
+
+	cmp eax, -1
+	je .no
+	cmp ecx, 1
+	je .done
+
+	mov bl, 1
+	ret
+
+.done:
+	mov bl, 0
+	ret
+
+.no:
+	mov esi, .no_msg
+	call kprint
+	mov esi, .package_name+1
+	mov edi, .name_str
+	movsd
+
+	mov esi, .name_str
+	call kprint
+	mov esi, .no_msg2
+	call kprint
+
+	mov eax, -1
+	ret
+
+.no_msg			db "ACPI ERROR: package ",0
+.name_str:		times 5 db 0
+.no_msg2		db " was not found.",10,0
+.package_name		db AML_OPCODE_NAME, 0, 0, 0, 0, AML_OPCODE_PACKAGE
+.original_scope		dd 0
+.scope			dd 0
+.end_scope		dd 0
+
+; acpi_parse_package:
+; Parses a package
+; In\	EAX = Pointer to package
+; In\	CL = Index to read from package
+; Out\	EDX:EAX = Data from package, -1 on error
+; Out\	ECX = Size of package in INDEXES not BYTES, -1 on error
+
+acpi_parse_package:
+	mov [.package], eax
+	mov [.index], cl
+
+	mov esi, [.package]
+	lodsb
+	cmp al, AML_OPCODE_PACKAGE
+	jne .not_package
+
+	lodsb
+	shr al, 6
+	and eax, 3
+	add esi, eax
+
+	; esi now points to package size in indexes
+	mov al, [esi]
+	mov [.size], al
+
+	mov al, [.index]
+	cmp al, [.size]
+	jge .out_of_range
+
+.start:
+	inc esi
+	mov [.current_index], 0
+
+.loop:
+	lodsb
+	cmp al, AML_OPCODE_ZERO
+	je .zero
+
+	cmp al, AML_OPCODE_ONE
+	je .one
+
+	cmp al, AML_OPCODE_ONES
+	je .ones
+
+	cmp al, AML_OPCODE_BYTEPREFIX
+	je .byte
+
+	cmp al, AML_OPCODE_WORDPREFIX
+	je .word
+
+	cmp al, AML_OPCODE_DWORDPREFIX
+	je .dword
+
+	cmp al, AML_OPCODE_QWORDPREFIX
+	je .qword
+
+	inc [.current_index]
+	jmp .loop
+
+.zero:
+	mov eax, 0
+	mov edx, 0
+
+	mov cl, [.current_index]
+	cmp cl, [.index]
+	je .done
+
+	inc [.current_index]
+	jmp .loop
+
+.one:
+	mov eax, 1
+	mov edx, 0
+
+	mov cl, [.current_index]
+	cmp cl, [.index]
+	je .done
+
+	inc [.current_index]
+	jmp .loop
+
+.ones:
+	mov eax, -1
+	mov edx, -1
+
+	mov cl, [.current_index]
+	cmp cl, [.index]
+	je .done
+
+	inc [.current_index]
+	jmp .loop
+
+.byte:
+	movzx eax, byte[esi]
+	mov edx, 0
+
+	mov cl, [.current_index]
+	cmp cl, [.index]
+	je .done
+
+	inc esi
+	inc [.current_index]
+	jmp .loop
+
+.word:
+	movzx eax, word[esi]
+	mov edx, 0
+
+	mov cl, [.current_index]
+	cmp cl, [.index]
+	je .done
+
+	add esi, 2
+	inc [.current_index]
+	jmp .loop
+
+.dword:
+	mov eax, [esi]
+	mov edx, 0
+
+	mov cl, [.current_index]
+	cmp cl, [.index]
+	je .done
+
+	add esi, 4
+	inc [.current_index]
+	jmp .loop
+
+.qword:
+	mov eax, [esi]
+	mov edx, [esi+4]
+
+	mov cl, [.current_index]
+	cmp cl, [.index]
+	je .done
+
+	add esi, 8
+	inc [.current_index]
+	jmp .loop
+
+.done:
+	movzx ecx, [.size]
+	ret
+
+.not_package:
+	mov esi, .not_package_msg
+	call kprint
+
+	mov edx, -1
+	mov eax, -1
+	mov ecx, -1
+	ret
+
+.out_of_range:
+	mov esi, .out_of_range_msg
+	call kprint
+
+	mov edx, -1
+	mov eax, -1
+	mov ecx, -1
+	ret
+
+.package		dd 0
+.index			db 0
+.size			db 0
+.current_index		db 0
+.not_package_msg	db "ACPI ERROR: attempted to parse package on non-package object.",10,0
+.out_of_range_msg	db "ACPI ERROR: out of range error in package object.",10,0
 
 ; acpi_get_field_member:
 ; Returns a member of a field region within an operation region
@@ -553,6 +868,7 @@ acpi_get_field_member:
 ; In\	EBX = Scope which contains method
 ; Out\	EDX:EAX = Return value of method
 ; Out\	EBX = 0 on success
+; Out\	ECX = Type of return value -- 0 = normal; 1 = package
 
 acpi_execute_method:
 	mov edx, [aml_stack]
@@ -622,8 +938,7 @@ acpi_execute_method:
 	mov esi, .no_return_msg
 	call kprint
 
-	mov ebx, -1
-	ret
+	jmp acpi_do_return.return_zero
 
 .bad_opcode:
 	mov [.opcode], al
@@ -641,13 +956,12 @@ acpi_execute_method:
 
 .tmp			dd 0
 .opcode			db 0
+.no_return_msg		db "ACPI WARNING: control method didn't return; assuming return 0.",10,0
 .not_method_msg		db "ACPI ERROR: attempted to execute unexecutable code.",10,0
-.no_return_msg		db "ACPI ERROR: control method didn't return.",10,0
 .bad_opcode_msg		db "ACPI ERROR: undefined opcode 0x",0
 
-;
-; INTERNAL ROUTINES
-;
+; acpi_do_return:
+; Executes Return() opcode
 
 acpi_do_return:
 	lodsb
@@ -672,62 +986,92 @@ acpi_do_return:
 	cmp al, AML_OPCODE_QWORDPREFIX
 	je .return_qword
 
-	mov eax, [esi]
+	cmp al, AML_OPCODE_PACKAGE
+	je .return_package
+
+	mov eax, [esi-1]
 	xor edx, edx
 	xor ebx, ebx
+	xor ecx, ecx
 	ret
 
 .return_zero:
 	xor eax, eax
 	xor edx, edx
 	xor ebx, ebx
+	xor ecx, ecx
 	ret
 
 .return_one:
 	mov eax, 1
 	xor edx, edx
 	xor ebx, ebx
+	xor ecx, ecx
 	ret
 
 .return_ones:
 	mov eax, -1
 	mov edx, -1
 	xor ebx, ebx
+	xor ecx, ecx
 	ret
 
 .return_byte:
 	movzx eax, byte[esi]
 	xor edx, edx
 	xor ebx, ebx
+	xor ecx, ecx
 	ret
 
 .return_word:
 	movzx eax, word[esi]
 	xor edx, edx
 	xor ebx, ebx
+	xor ecx, ecx
 	ret
 
 .return_dword:
 	mov eax, [esi]
 	xor edx, edx
 	xor ebx, ebx
+	xor ecx, ecx
 	ret
 
 .return_qword:
 	mov eax, [esi]
 	mov edx, [esi+4]
 	xor ebx, ebx
+	xor ecx, ecx
 	ret
+
+.return_package:
+	; when returning a package, just return a pointer
+	mov eax, esi
+	dec eax
+	xor edx, edx
+	xor ebx, ebx
+	mov ecx, 1
+	ret
+
+; acpi_do_name:
+; Skips over a Name() decleration
 
 acpi_do_name:
 	add dword[edx+4], 5
 	jmp acpi_execute_method.execute_loop
+
+; acpi_do_package:
+; Skips over a Package() decleration
 
 acpi_do_package:
 	call acpi_parse_size
 	add dword[edx+4], eax
 	inc dword[edx+4]
 	jmp acpi_execute_method.execute_loop
+
+; acpi_do_store:
+; Executes a Store() opcode
+; Currently supports OperationRegion in SystemMemory and SystemIO
 
 acpi_do_store:
 	lodsb
