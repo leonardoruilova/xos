@@ -193,6 +193,7 @@ kmain32:
 	call syscall_init
 	call tasking_init
 	call acpi_init
+	call acpi_aml_init
 	;call apic_init
 	call pci_init
 	call blkdev_init
@@ -444,8 +445,10 @@ task3:
 	include "kernel/firmware/vbe.asm"	; VBE 2.0 driver
 	include "kernel/firmware/pit.asm"	; PIT driver
 	include "kernel/firmware/pci.asm"	; PCI driver
-	include "kernel/firmware/acpitbl.asm"	; ACPI table functions
-	include "kernel/firmware/acpirun.asm"	; ACPI runtime functions (DSDT, shutdown, reset, ...)
+
+	; ACPI
+	include "kernel/acpi/tables.asm"	; ACPI table functions
+	include "kernel/acpi/aml.asm"		; ACPI AML functions
 
 	; Miscellaneous Stuff
 	include "kernel/misc/kprint.asm"	; debugging stuff
@@ -483,8 +486,8 @@ task3:
 
 	; Default mouse cursor
 	cursor:
-	;file "kernel/gui/themes/cursor_black.bmp"	; choose whichever cursor you like
-	file "kernel/gui/themes/cursor_white.bmp"	; or even make your own; in Paint and GIMP use a 24-bit bitmap
+	file "kernel/gui/themes/cursor_black.bmp"	; choose whichever cursor you like
+	;file "kernel/gui/themes/cursor_white.bmp"	; or even make your own; in Paint and GIMP use a 24-bit bitmap
 	; Default bitmap font
 	font:
 	file "kernel/fonts/alotware.bin"

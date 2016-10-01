@@ -68,23 +68,20 @@ wm_dirty			db 1	; when set to 1, the WM needs a redraw
 align 4
 wm_color			dd 0x00B0B0
 ;wm_color			dd 0x004288
-;window_header			dd 0xE8A200
-window_header			dd 0x808080
-window_title			dd 0xD8D8D8
+window_title			dd 0x000000
 window_inactive_title		dd 0x000000
 window_border			dd 0xD8D8D8
-;window_active_border		dd 0x707070
-window_active_border		dd 0x404040
+window_active_border		dd 0x808080
 window_close_color		dd 0xFF3030
 window_background		dd 0xFFFFFF
-window_opacity			db 1		; valid values are 0 to 4, 0 = opaque, 1 = less transparent, 4 = most transparent.
+window_opacity			db 0		; valid values are 0 to 4, 0 = opaque, 1 = less transparent, 4 = most transparent.
 
 align 4
-window_border_x_min		dw 8		; max x pos for a 0 width window
-window_border_y_min		dw 30		; max y pos for a 0 height window
+window_border_x_min		dw 0		; max x pos for a 0 width window
+window_border_y_min		dw 24		; max y pos for a 0 height window
 window_title_x			dw 24
 window_title_y			dw 4
-window_canvas_x			dw 4
+window_canvas_x			dw 0
 window_canvas_y			dw 24
 
 default_wallpaper		db "wp1.bmp",0	; file to use as wallpaper
