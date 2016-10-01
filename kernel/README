@@ -1,8 +1,9 @@
 This directory contains the source code of the xOS kernel: the core component of xOS.
 It is divided into subdirectories that are sorted out logically:
 
+  acpi/       Contains an ACPI implementation.
   blkdev/     "BLocK DEVices", contains device drivers for storage devices, including ATA and AHCI.
-  firmware/   Contains firmware drivers, such as ACPI and PCI.
+  firmware/   Contains firmware drivers, such as PCI and (someday) HPET.
   fonts/      Contains bitmap fonts for use by the kernel.
   fs/         Contains low-level filesystem drivers.
   gui/        Contains a minimal graphics library and event-driven windowing system.
