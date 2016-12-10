@@ -202,16 +202,16 @@ kmain32:
 	call use_back_buffer
 	call unlock_screen
 
-	mov al, 5
-	call acpi_sleep
+	mov esi, test_task
+	call create_task
 
-	; for testing
-	mov edx, task1
-	call create_task_memory
-	mov edx, task2
-	call create_task_memory
-	mov edx, task3
-	call create_task_memory
+	mov esi, test_task2
+	call create_task
+
+	call yield
+
+test_task		db "hello.exe",0
+test_task2		db "draw.exe",0
 
 ; idle_process:
 ; The only process on the system which runs in ring 0
@@ -222,216 +222,9 @@ idle_process:
 	sti
 	hlt
 	call yield
-task1:
-	mov ebp, 0
-	mov ax, 48
-	mov bx, 48
-	mov si, 360
-	mov di, 256
-	mov dx, 0
-	mov ecx, .title
-	int 0x60
-
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16
-	mov dx, 16
-	mov esi, .text
-	mov ebx, 0x000000
-	int 0x60
-
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16
-	mov dx, 32
-	mov esi, .total
-	mov ebx, 0
-	int 0x60
-
-	mov eax, [idle_time]
-	add eax, [nonidle_time]
-	call int_to_string
-
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16+(.total_len * 8)
-	mov dx, 32
-	mov ebx, 0
-	int 0x60
-
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16
-	mov dx, 48
-	mov esi, .nonidle
-	mov ebx, 0
-	int 0x60
-
-	mov eax, [nonidle_time]
-	call int_to_string
-
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16+(.nonidle_len * 8)
-	mov dx, 48
-	mov ebx, 0
-	int 0x60
-
-.wait:
-	; read window event
-	mov ebp, 4
-	mov eax, 0
-	int 0x60
-
-	test ax, WM_LEFT_CLICK
-	jnz .clicked
-
-	mov ebp, 1
-	int 0x60
-	jmp .wait
-
-.clicked:
-	mov ebp, 8
-	mov eax, 0
-	mov ebx, 0xFFFFFF
-	int 0x60
-
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16
-	mov dx, 16
-	mov esi, .text
-	mov ebx, 0x000000
-	int 0x60
-
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16
-	mov dx, 32
-	mov esi, .total
-	mov ebx, 0
-	int 0x60
-
-	mov eax, [idle_time]
-	add eax, [nonidle_time]
-	call int_to_string
-
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16+(.total_len * 8)
-	mov dx, 32
-	mov ebx, 0
-	int 0x60
-
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16
-	mov dx, 48
-	mov esi, .nonidle
-	mov ebx, 0
-	int 0x60
-
-	mov eax, [nonidle_time]
-	call int_to_string
-
-	mov ebp, 7
-	mov eax, 0
-	mov cx, 16+(.nonidle_len * 8)
-	mov dx, 48
-	mov ebx, 0
-	int 0x60
-
-	jmp .wait
-
-.title			db "CPU Usage",0
-.text			db "Click this window to refresh CPU usage. ",0
-.total			db "Total time: ",0
-.total_len		= $ - .total - 1
-.nonidle		db "Non-idle time: ",0
-.nonidle_len		= $ - .nonidle - 1
-
-task2:
-	mov ebp, 0
-	mov ax, 350
-	mov bx, 192
-	mov si, 256
-	mov di, 130
-	mov dx, 0
-	mov ecx, .title
-	int 0x60
-
-	mov ebp, 7
-	mov eax, 1
-	mov esi, .text
-	mov cx, 8
-	mov dx, 16
-	mov ebx, 0
-	int 0x60
-
-.hang:
-	mov ebp, 1
-	int 0x60
-	jmp .hang
-
-.title			db "Hello world",0
-.text			db "Welcome to the Hello World ",10
-			db "application!!!",0
-
-task3:
-	mov ebp, 0
-	mov ax, 8
-	mov bx, 8
-	mov si, 256
-	mov di, 256
-	mov dx, 0
-	mov ecx, .title
-	int 0x60
-
-.wait:
-	; wait for window event
-	mov ebp, 4
-	mov eax, 2
-	int 0x60
-
-	test ax, WM_LEFT_CLICK
-	jnz .got_event
-
-	mov ebp, 1
-	int 0x60
-	jmp .wait
-
-.got_event:
-	mov ebp, 5		; read mouse status
-	mov eax, 2
-	int 0x60
-
-	jcxz .check_zero
-	jmp .work
-
-.check_zero:
-	cmp dx, 0
-	je .wait
-
-.work:
-	mov ebp, 2		; get pixel offset
-	mov eax, 2
-	int 0x60
-
-	cmp eax, -1
-	je .wait
-
-	mov edi, eax
-	mov eax, 0
-	stosd
-	stosd
-	stosd
-	stosd
-	jmp .wait
-
-.title			db "Draw",0
 
 	;
-	; END OF KERNEL INITIALIZATION CODE
+	; END OF MAIN KERNEL CODE
 	; INCLUDE KERNEL STUFF
 	;
 

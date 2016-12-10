@@ -52,7 +52,16 @@ TASK_STACK		= 65536		; 64 KB
 ; Load Address of a Task
 TASK_LOAD_ADDR		= 0x8000000	; 128 MB
 
-MAXIMUM_TASKS		= 32		; probably expand this in the future?
+MAXIMUM_TASKS		= 256		; probably expand this in the future?
+
+; Program Header
+PROGRAM_SIGNATURE	= 0x00
+PROGRAM_TYPE		= 0x04
+PROGRAM_ENTRY		= 0x08
+
+; Program Type Values
+PROGRAM_FILE		= 0x00
+DRIVER_FILE		= 0x01
 
 align 2
 running_tasks		dw 0
@@ -196,6 +205,17 @@ yield:
 	test word[eax], TASK_PRESENT
 	jz .next
 
+	; Map the task in memory
+	push eax
+	mov ebp, eax		; EBP = task information
+	mov eax, TASK_LOAD_ADDR
+	mov ebx, [ebp+TASK_PMEM_BASE]
+	mov ecx, [ebp+TASK_MEM_SIZE]
+	mov dl, PAGE_PRESENT OR PAGE_WRITEABLE OR PAGE_USER
+	call vmm_map_memory
+
+	pop eax			; EAX = task information
+
 	; Execute this task in ring 3
 	mov dx, 0x23
 	mov ds, dx
@@ -231,6 +251,12 @@ yield:
 	mov [eax+TASK_EFLAGS], edx
 
 	;sub esp, 4	; restore stack
+
+	; unmap the current task for the virtual address space
+	mov ecx, [eax+TASK_MEM_SIZE]		; memory size in pages
+	mov eax, TASK_LOAD_ADDR
+	call vmm_unmap_memory
+
 	jmp .next
 
 .idle:
@@ -238,6 +264,160 @@ yield:
 	add esp, 4		; clean up the stack
 	jmp idle_process	; if no processes are running, keep the CPU usage low
 
+; create_task:
+; Creates a task from a file
+; In\	ESI = Filename
+; Out\	EAX = PID, or error code (-1 = no memory/free tasks, -2 = file read error, -3 = corrupt program)
 
+create_task:
+	mov [.filename], esi
+
+	call get_free_task
+	cmp eax, -1
+	je .no_memory
+
+	mov [.pid], eax
+
+	; allocate a stack
+	mov ecx, TASK_STACK
+	call malloc
+	add eax, TASK_STACK
+	mov [.stack], eax
+
+	; open the file
+	mov esi, [.filename]
+	mov edx, FILE_READ
+	call xfs_open
+	cmp eax, -1
+	je .file_error
+
+	mov [.handle], eax
+
+	; get file size
+	mov eax, [.handle]
+	mov ebx, SEEK_END
+	mov ecx, 0
+	call xfs_seek
+	cmp eax, 0
+	jne .file_error
+
+	mov eax, [.handle]
+	call xfs_tell
+	cmp eax, -1
+	je .file_error
+
+	mov [.file_size], eax
+
+	mov eax, [.handle]
+	mov ebx, SEEK_SET
+	mov ecx, 0
+	call xfs_seek
+	cmp eax, 0
+	jne .file_error
+
+	; convert the file size to pages
+	mov ecx, [.file_size]
+	add ecx, 4095
+	shr ecx, 12
+	mov [.pages], ecx
+	call pmm_alloc
+
+	cmp eax, 0
+	je .no_memory
+	mov [.memory], eax
+
+	mov eax, TASK_LOAD_ADDR
+	mov ebx, [.memory]
+	mov ecx, [.pages]
+	mov dl, PAGE_PRESENT OR PAGE_WRITEABLE OR PAGE_USER
+	call vmm_map_memory
+
+	mov eax, [.handle]
+	mov edi, TASK_LOAD_ADDR
+	mov ecx, [.file_size]
+	call xfs_read
+
+	cmp eax, [.file_size]
+	jne .file_error
+
+	mov eax, [.handle]
+	call xfs_close
+
+	; verify the program is valid
+	mov esi, TASK_LOAD_ADDR
+	cmp dword[esi], "XOS1"
+	jne .corrupt
+
+	cmp dword[esi+PROGRAM_TYPE], PROGRAM_FILE
+	jne .corrupt
+
+	mov eax, [esi+PROGRAM_ENTRY]
+	mov [.entry], eax
+
+	; create the task structure
+	mov edi, [.pid]
+	shl edi, 5		; mul 32
+	add edi, [task_structure]
+	mov word[edi], TASK_PRESENT
+
+	mov ax, [current_task]
+	mov [edi+TASK_PARENT], ax
+
+	mov eax, [.entry]
+	mov [edi+TASK_EIP], eax
+	mov dword[edi+TASK_EFLAGS], 0x202
+
+	mov eax, [.stack]
+	mov [edi+TASK_ESP], eax
+
+	mov eax, [.memory]
+	mov [edi+TASK_PMEM_BASE], eax
+
+	mov eax, [.pages]
+	mov [edi+TASK_MEM_SIZE], eax
+
+	; ready ;)
+	cmp [current_task], 0	; idle
+	je .finish
+
+	mov eax, TASK_LOAD_ADDR
+	mov ecx, [.pages]
+	call vmm_unmap_memory
+
+	movzx ebp, [current_task]
+	shl ebp, 5
+	add ebp, [task_structure]
+	mov eax, TASK_LOAD_ADDR
+	mov ebx, [ebp+TASK_PMEM_BASE]
+	mov ecx, [ebp+TASK_MEM_SIZE]
+	mov dl, PAGE_PRESENT OR PAGE_WRITEABLE OR PAGE_USER
+	call vmm_map_memory
+
+.finish:
+	inc [running_tasks]
+	mov eax, [.pid]
+
+	ret
+
+.no_memory:
+	mov eax, -1
+	ret
+
+.file_error:
+	mov eax, -2
+	ret
+
+.corrupt:
+	mov eax, -3
+	ret
+
+.entry				dd 0
+.filename			dd 0
+.pid				dd 0
+.stack				dd 0
+.handle				dd 0
+.file_size			dd 0
+.pages				dd 0
+.memory				dd 0
 
 

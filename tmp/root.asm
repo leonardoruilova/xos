@@ -29,3 +29,32 @@ wp1:
 				dw 2016
 .reserved2			dw 0
 
+hello:
+
+.filename			db "hello   exe"		; 0
+.reserved1			db 0				; 11
+.lba_sector			dd 4000				; 12
+.size_sectors			dd 1				; 16
+.size_bytes			dd 512				; 20
+.time				db 0
+				db 0
+.date				db 5
+				db 1
+				dw 2016
+.reserved2			dw 0
+
+draw:
+
+.filename			db "draw    exe"		; 0
+.reserved1			db 0				; 11
+.lba_sector			dd 4001				; 12
+.size_sectors			dd 1				; 16
+.size_bytes			dd 512				; 20
+.time				db 0
+				db 0
+.date				db 5
+				db 1
+				dw 2016
+.reserved2			dw 0
+
+
