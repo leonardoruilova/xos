@@ -68,13 +68,14 @@ wm_dirty			db 1	; when set to 1, the WM needs a redraw
 align 4
 wm_color			dd 0x00B0B0
 ;wm_color			dd 0x004288
-window_title			dd 0x000000
-window_inactive_title		dd 0x000000
-window_border			dd 0xD8D8D8
-window_active_border		dd 0x808080
+window_title			dd 0xFFFFFF
+window_inactive_title		dd 0xFFFFFF
+window_border			dd 0x505050
+window_active_border		dd 0x505050
+window_active_outline		dd 0x00A2E8
 window_close_color		dd 0xFF3030
 window_background		dd 0xFFFFFF
-window_opacity			db 0		; valid values are 0 to 4, 0 = opaque, 1 = less transparent, 4 = most transparent.
+window_opacity			db 1		; valid values are 0 to 4, 0 = opaque, 1 = less transparent, 4 = most transparent.
 
 align 4
 window_border_x_min		dw 0		; max x pos for a 0 width window
@@ -669,6 +670,15 @@ align 32
 	mov edx, [window_active_border]
 	mov cl, [window_opacity]
 	call alpha_fill_rect
+
+	; and the outline
+	mov ax, [.x]
+	mov bx, [.y]
+	mov si, [.width]
+	mov di, 2
+	add si, [window_border_x_min]
+	mov edx, [window_active_outline]
+	call fill_rect
 
 	; the close button
 	mov ax, [.x]
