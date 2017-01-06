@@ -18,7 +18,7 @@ For building requirements, you'll need [Flat Assembler](http://flatassembler.net
 
 #Testing xOS
 xOS is provided as a disk image. `disk.hdd` in this repository can be considered the latest nightly build. It is very likely unstable and may crash. Releases are under the release tab, or on the site. This disk image can be used on Bochs, QEMU and VirtualBox. On Bochs, the CHS values are 71/16/63. For now, xOS only supports ATA and SATA hard disks, and SATA support is somewhat incomplete, and so on VirtualBox, use IDE instead of SATA.  
-To test xOS under QEMU, simply run `qemu-system-i386 -hda disk.hdd`.
+To test xOS under QEMU, simply run `qemu-system-i386 -hda disk.hdd -vga std`. The last option `-vga std` apparantly is needed on some QEMU builds, because xOS only supports 32-bit display modes while some QEMU builds use 24-bit by default.
 
 #Contact
 I can be contacted at omarx024@gmail.com. I am also user **omarrx024** on the OSDev Forum.
