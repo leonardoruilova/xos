@@ -420,6 +420,8 @@ ps2_mouse_irq:
 .data:
 	;test al, MOUSE_X_OVERFLOW OR MOUSE_Y_OVERFLOW
 	;jnz .done
+	test al, 8	; align
+	jz .done
 
 	mov [mouse_packet.data], al
 	inc [mouse_irq_state]

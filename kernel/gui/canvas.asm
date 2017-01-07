@@ -94,8 +94,8 @@ wm_clear:
 	rep stosd
 
 .done:
-	mov [wm_dirty], 1
-	call wm_redraw
+	;mov [wm_dirty], 1
+	;call wm_redraw
 	ret
 
 .color			dd 0
@@ -236,8 +236,7 @@ wm_draw_text:
 	jmp .loop
 
 .done:
-	mov [wm_dirty], 1
-	call wm_redraw
+	;call wm_redraw
 	ret
 
 .handle			dd 0

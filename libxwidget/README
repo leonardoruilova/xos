@@ -1,0 +1,3 @@
+libxwidget is the default UI widget library in xOS.
+The kernel provides all applications the capability of creating a window and drawing in it. libxwidget implements buttons and (soon) other events and components entirely in userspace on top of this basic kernel interface.
+Instructions for using libxwidget in your applications is in the doc/ folder.

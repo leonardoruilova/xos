@@ -51,9 +51,8 @@ WM_NO_BORDER			= 0x0010
 WM_LEFT_CLICK			= 0x0001
 WM_RIGHT_CLICK			= 0x0002
 WM_KEYPRESS			= 0x0004
-WM_BUTTON			= 0x0008
 
-MAXIMUM_WINDOWS			= 16
+MAXIMUM_WINDOWS			= 32
 
 align 4
 open_windows			dd 0
@@ -61,7 +60,7 @@ active_window			dd -1
 window_handles			dd 0
 wm_background			dd 0
 wm_running			db 0
-wm_dirty			db 1	; when set to 1, the WM needs a redraw
+;wm_dirty			db 1	; when set to 1, the WM needs a redraw
 
 ; Window Theme!
 ; TO-DO: Set these values from a theme file from the disk (i.e. make the gui customizable)
@@ -78,8 +77,8 @@ window_background		dd 0xFFFFFF
 window_opacity			db 1		; valid values are 0 to 4, 0 = opaque, 1 = less transparent, 4 = most transparent.
 
 align 4
-window_border_x_min		dw 0		; max x pos for a 0 width window
-window_border_y_min		dw 24		; max y pos for a 0 height window
+window_border_x_min		dw 0		; min x pos for a 0 width window
+window_border_y_min		dw 24		; min y pos for a 0 height window
 window_title_x			dw 24
 window_title_y			dw 4
 window_canvas_x			dw 0
@@ -87,6 +86,7 @@ window_canvas_y			dw 24
 
 default_wallpaper		db "wp1.bmp",0	; file to use as wallpaper
 
+align 8
 wm_wallpaper			dd 0		; pointer to raw pixel buffer
 wm_wallpaper_size		dd 0		; size of raw pixel buffer
 wm_wallpaper_width		dw 0
@@ -185,7 +185,7 @@ wm_init:
 	mov eax, [.tmp_memory]
 	call kfree
 
-	mov [wm_dirty], 1
+	;mov [wm_dirty], 1
 	call wm_redraw
 	ret
 
@@ -332,6 +332,9 @@ wm_make_handle:
 	mov edx, [.framebuffer]
 	mov [eax+WINDOW_FRAMEBUFFER], edx
 
+	movzx edx, [current_task]	; pid of the running process
+	mov [eax+WINDOW_PID], edx
+
 	ret
 
 .x			dw 0
@@ -420,7 +423,7 @@ wm_create_window:
 	mov [active_window], eax	; by default, when a new window is created, the focus goes to it
 	inc [open_windows]
 
-	mov [wm_dirty], 1
+	;mov [wm_dirty], 1
 	call wm_redraw
 
 	mov eax, [.handle]	; return the window handle to the application
@@ -548,8 +551,8 @@ align 2
 ; Redraws all windows
 align 32
 wm_redraw:
-	cmp [wm_dirty], 1
-	jne .done
+	;cmp [wm_dirty], 1
+	;jne .done
 
 	; lock the screen to improve performance!
 	call use_back_buffer
@@ -710,7 +713,7 @@ align 32
 	jmp .done
 
 .done:
-	mov [wm_dirty], 0
+	;mov [wm_dirty], 0
 	call redraw_mouse	; this takes care of all the dirty work before actually drawing the cursor ;)
 	ret
 
@@ -771,19 +774,19 @@ wm_event:
 	jg .done
 
 	or word[eax+WINDOW_EVENT], WM_LEFT_CLICK
-	mov [wm_dirty], 1
+	;mov [wm_dirty], 1
 
 	jmp .done
 
 .set_focus:
 	call wm_detect_window
 	mov [active_window], eax
-	mov [wm_dirty], 1
+	;mov [wm_dirty], 1
 	jmp .done
 	;jmp .done
 
 .drag:
-	mov [wm_dirty], 1
+	;mov [wm_dirty], 1
 
 	; if the user dragged something --
 	; -- we'll need to know if a window has been dragged --

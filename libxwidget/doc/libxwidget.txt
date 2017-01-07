@@ -1,0 +1,110 @@
+
+libxwidget is designed for use by assembly-language programs. A C/C++ equivalent will come soon, but is not on my priority list for now. The xOS kernel provides a built-in window manager with support for events and a canvas. The canvas is a 32-bit RGB space in which programs can write to and request redraws when possible and the event system is based on mouse clicks and keypresses. libxwidget uses this functionality and abstracts it as much as possible from the user; instead using "components" such as buttons, labels, and other basic UI elements. libxwidget thus has a built-in graphics library that writes to the canvas of its windows. To use libxwidget, one should simply include the main libxwidget.asm file in their source and that's all really needed as it's very small and lightweight.
+libxwidget is based on the idea of handles; each window has a handle, or a number that defines it, and so do components. To reference a window you need a window handle, and the same applies to all components of the window.
+For example code implemented using libxwidget, see /buttontest/buttontest.asm. That application uses the button, label and event functionality of libxwidget.
+
+The "public" libxwidget functions that are meant to be used by programs are documented below.
+
+	* xwidget_init
+	* xwidget_destroy
+	* xwidget_get_version
+	* xwidget_create_window
+	* xwidget_wait_event
+	* xwidget_create_button
+	* xwidget_create_label
+
+	*	*	*
+	*	*	*
+
+* xwidget_init:
+Description: This function must be called in the beginning of any application that will use libxwidget. It must be called before the program does anything related to its user interface, that is it must be called before the application creates its window.
+Parameters:
+	None.
+
+Return value:
+	None.
+
+	*	*	*
+	*	*	*
+
+* xwidget_destroy:
+Description: This function must be called in the end of the application, right before it quits after it has destroyed all its UI elements. It should undo any operations done by xwidget_init, such as closing open files and freeing allocated memory.
+Parameters:
+	None.
+
+Return value:
+	None.
+
+	*	*	*
+	*	*	*
+
+* xwidget_get_version:
+Description: This function returns a pointer to an ASCIIZ string that contains the version of libxwidget.
+Parameters:
+	None.
+
+Return value:
+	EAX	=	Pointer to string.
+
+	*	*	*
+	*	*	*
+
+* xwidget_create_window:
+Description: This function creates a window with specified X/Y position, width/height and text to show in the title bar. In order to use libxwidget's components in a window, it must be created using this function and not using the kernel's system call directly; as libxwidget abstracts the kernel's internal window handles by using its own.
+Parameters:
+	AX	=	X position.
+	BX	=	Y position.
+	SI	=	Width.
+	DI	=	Height.
+	DX	=	Window flags (these are still undefined; must be zero.)
+	ECX	=	Pointer to window title.
+
+Return value:
+	EAX	=	Window handle for use with libxwidget; -1 on error.
+	EBX	=	Window handle for direct use with the kernel; -1 on error.
+
+	*	*	*
+	*	*	*
+
+* xwidget_wait_event:
+Description: This function waits for an event to happen on one of the components present on any one of the windows present.
+Parameters:
+	None.
+
+Return value:
+	EAX	=	Event type (only XWIDGET_BUTTON is defined as of now.)
+	EBX	=	Component handle of the event.
+
+	*	*	*
+	*	*	*
+
+* xwidget_create_button:
+Description: This function creates a button which, when clicked on, returns events using the function documented above.
+Parameters:
+	EAX	=	Window handle to create the button in (libxwidget handle, not the kernel.)
+	CX	=	X position.
+	DX	=	Y position.
+	ESI	=	Pointer to text of button.
+
+Return value:
+	EAX	=	Component handle of the button, -1 on error.
+
+	*	*	*
+	*	*	*
+
+* xwidget_create_label:
+Description: This function creates static text.
+Parameters:
+	EAX	=	Window handle to create the label in (libxwidget handle, not the kernel.)
+	CX	=	X position.
+	DX	=	Y position.
+	ESI	=	Pointer to text.
+	EBX	=	Color of text.
+
+Return value:
+	EAX	=	Component handle of the label, -1 on error.
+
+
+
+
+

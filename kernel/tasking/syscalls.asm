@@ -4,7 +4,7 @@
 
 use32
 
-MAXIMUM_FUNCTION		= 0x0008
+MAXIMUM_FUNCTION		= 0x0012
 
 ; Function Table ;)
 align 16
@@ -15,9 +15,19 @@ api_table:
 	dd wm_redraw		; 0x0003
 	dd wm_read_event	; 0x0004
 	dd wm_read_mouse	; 0x0005
-	dd wm_render_char	; 0x0006
+	dd wm_get_window	; 0x0006
 	dd wm_draw_text		; 0x0007
 	dd wm_clear		; 0x0008
+	dd malloc		; 0x0009
+	dd free			; 0x000A
+	dd xfs_open		; 0x000B
+	dd xfs_close		; 0x000C
+	dd xfs_seek		; 0x000D
+	dd xfs_tell		; 0x000E
+	dd xfs_read		; 0x000F
+	dd 0;xfs_write		; 0x0010
+	dd wm_render_char	; 0x0011
+	dd wm_kill		; 0x0012
 
 ; syscall_init:
 ; Installs the kernel API interrupt vector

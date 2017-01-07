@@ -32,13 +32,7 @@ redraw_screen:
 align 64
 .loop:
 	prefetchnta [esi+0x80]
-	prefetchnta [esi+0x90]
-	prefetchnta [esi+0xA0]
-	prefetchnta [esi+0xB0]
 	prefetchnta [esi+0xC0]
-	prefetchnta [esi+0xD0]
-	prefetchnta [esi+0xE0]
-	prefetchnta [esi+0xF0]
 
 	movdqa xmm0, [esi]
 	movdqa xmm1, [esi+0x10]
@@ -60,8 +54,7 @@ align 64
 
 	add esi, 128
 	add edi, 128
-	dec ecx
-	jnz .loop
+	loop .loop
 
 .quit:
 	ret

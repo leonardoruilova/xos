@@ -57,4 +57,18 @@ draw:
 				dw 2016
 .reserved2			dw 0
 
+buttontest:
+
+.filename			db "button  exe"		; 0
+.reserved1			db 0				; 11
+.lba_sector			dd 4002				; 12
+.size_sectors			dd 8				; 16
+.size_bytes			dd 512*8			; 20
+.time				db 0
+				db 0
+.date				db 5
+				db 1
+				dw 2016
+.reserved2			dw 0
+
 

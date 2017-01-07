@@ -400,14 +400,23 @@ create_task:
 	ret
 
 .no_memory:
+	mov esi, .no_memory_msg
+	call kprint
+
 	mov eax, -1
 	ret
 
 .file_error:
+	mov esi, .file_error_msg
+	call kprint
+
 	mov eax, -2
 	ret
 
 .corrupt:
+	mov esi, .corrupt_msg
+	call kprint
+
 	mov eax, -3
 	ret
 
@@ -419,5 +428,9 @@ create_task:
 .file_size			dd 0
 .pages				dd 0
 .memory				dd 0
+.no_memory_msg			db "load error: Insufficient memory to start program.",10,0
+.file_error_msg			db "load error: Unable to read program file.",10,0
+.corrupt_msg			db "load error: Program file is corrupt.",10,0
+
 
 

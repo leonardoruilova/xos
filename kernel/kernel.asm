@@ -7,12 +7,12 @@ org 0x1000
 
 	jmp 0x0000:kmain16
 
-	kernel_version			db "xOS32 v0.06 (6 January 2017)",0
+	kernel_version			db "xOS32 v0.07 (7 January 2017)",0
 	copyright_str			db "Copyright (C) 2016-2017 by Omar Mohammad, all rights reserved.",0
 	newline				db 10,0
 
 	align 16
-	stack16:			rb 2048
+	stack16:			rb 3072
 
 ; kmain16:
 ; 16-bit stub before kernel
@@ -208,10 +208,14 @@ kmain32:
 	mov esi, test_task2
 	call create_task
 
+	mov esi, test_task3
+	call create_task
+
 	call yield
 
 test_task		db "hello.exe",0
 test_task2		db "draw.exe",0
+test_task3		db "button.exe",0
 
 ; idle_process:
 ; The only process on the system which runs in ring 0
