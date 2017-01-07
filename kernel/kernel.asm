@@ -291,7 +291,8 @@ idle_process:
 	file "kernel/gui/themes/cursor_white.bmp"	; or even make your own; in Paint and GIMP use a 24-bit bitmap
 	; Default bitmap font
 	font:
-	file "kernel/fonts/alotware.bin"
+	file "kernel/fonts/term.bin"
+	;file "kernel/fonts/alotware.bin"
 	;file "kernel/fonts/cp437.bin"
 	;include "kernel/fonts/glaux-mono.asm"
 
