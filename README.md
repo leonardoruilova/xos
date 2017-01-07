@@ -11,14 +11,13 @@ xOS is still under early stages of development; although the following features 
 #Requirements
 * A Pentium CPU with SSE2, or better.
 * VESA 2.0-compatible BIOS, capable of true-color.
-* Little over 16 MB of RAM.
-* Few megabytes disk space.
+* Little over 32 MB of RAM.
+* Few megabytes of disk space.
 
-For building requirements, you'll need [Flat Assembler](http://flatassembler.net) in your `$PATH`. Then, run `build.sh` and it will build the xOS kernel to `disk.hdd`. Feel free to tweak with xOS as you like, just please give me feedback.
+For building requirements, you'll need [Flat Assembler](http://flatassembler.net) in your `$PATH`. Then, run `make` and it will build xOS. Feel free to tweak with xOS as you like, just please give me feedback. To clean up the working directory afterwards, run `make clean`.
 
 #Testing xOS
-xOS is provided as a disk image. `disk.hdd` in this repository can be considered the latest nightly build. It is very likely unstable and may crash. Releases are under the release tab, or on the site. This disk image can be used on Bochs, QEMU and VirtualBox. On Bochs, the CHS values are 71/16/63. For now, xOS only supports ATA and SATA hard disks, and SATA support is somewhat incomplete, and so on VirtualBox, use IDE instead of SATA.  
-To test xOS under QEMU, simply run `qemu-system-i386 -hda disk.hdd -vga std`. The last option `-vga std` apparantly is needed on some QEMU builds, because xOS only supports 32-bit display modes while some QEMU builds use 24-bit by default.
+xOS is provided as a disk image. `disk.hdd` in this repository can be considered the latest nightly build. It is very likely unstable and may crash. Old demo releases are in the "releases" tab. `disk.hdd` is a prebuilt hard disk image that can be used with QEMU or VirtualBox, though it performs best on VirtualBox. If you're tweaking the source and want to build xOS, simply run `make` as said above. To run xOS under QEMU, then `make run`. The Makefile assumes FASM and QEMU are both in your `$PATH`.
 
 #Contact
 I can be contacted at omarx024@gmail.com. I am also user **omarrx024** on the OSDev Forum.
