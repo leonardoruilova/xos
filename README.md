@@ -1,4 +1,4 @@
-![xOS User Interface](https://s30.postimg.org/hhwwn5kwh/xos.png)  
+![xOS User Interface Showing Sample Applications](https://s23.postimg.org/nb92qf82j/calc2.png)  
 xOS is an operating system written for the PC entirely in assembly language. This results in faster execution, smaller program sizes and overall simplicity. The goal of xOS is to be fully functional, yet small and simple.  
 #Features
 xOS is still under early stages of development; although the following features are already implemented:
