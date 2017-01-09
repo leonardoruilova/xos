@@ -551,6 +551,8 @@ align 2
 ; Redraws all windows
 align 32
 wm_redraw:
+	cli
+
 	;cmp [wm_dirty], 1
 	;jne .done
 

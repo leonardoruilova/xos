@@ -211,11 +211,15 @@ kmain32:
 	mov esi, test_task3
 	call create_task
 
+	mov esi, test_task4
+	call create_task
+
 	call yield
 
 test_task		db "hello.exe",0
 test_task2		db "draw.exe",0
 test_task3		db "button.exe",0
+test_task4		db "calc.exe",0
 
 ; idle_process:
 ; The only process on the system which runs in ring 0

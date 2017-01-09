@@ -10,6 +10,7 @@ all:
 	fasm hello/hello.asm out/hello.exe
 	fasm draw/draw.asm out/draw.exe
 	fasm buttontest/buttontest.asm out/buttontest.exe
+	fasm calc/calc.asm out/calc.exe
 	dd if=out/mbr.bin conv=notrunc bs=512 count=1 of=disk.hdd
 	dd if=out/boot_hdd.bin conv=notrunc bs=512 seek=63 of=disk.hdd
 	dd if=out/root.bin conv=notrunc bs=512 seek=64 of=disk.hdd
@@ -17,6 +18,7 @@ all:
 	dd if=out/hello.exe conv=notrunc bs=512 seek=4000 of=disk.hdd
 	dd if=out/draw.exe conv=notrunc bs=512 seek=4001 of=disk.hdd
 	dd if=out/buttontest.exe conv=notrunc bs=512 seek=4002 of=disk.hdd
+	dd if=out/calc.exe conv=notrunc bs=512 seek=4010 of=disk.hdd
 	dd if=wp/wp5.bmp conv=notrunc bs=512 seek=1000 of=disk.hdd
 	gcc -c xfs/src/main.c -o out/xfs/main.o
 	gcc -c xfs/src/xfs.c -o out/xfs/xfs.o

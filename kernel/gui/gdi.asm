@@ -59,6 +59,18 @@ align 64
 .quit:
 	ret
 
+; get_screen_info:
+; Returns the screen information
+; In\	Nothing
+; Out\	AX/BX = X/Y resolution
+; Out\	CL = Bits per pixel (always 32 because xOS only supports 32-bit mode)
+align 32
+get_screen_info:
+	mov eax, [screen.width]
+	mov ebx, [screen.height]
+	mov ecx, [screen.bpp]
+	ret
+
 ; use_back_buffer:
 ; Forces the system to use the back buffer
 align 32

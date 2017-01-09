@@ -143,5 +143,22 @@ align 4
 .components_end		dd 0
 .tmp			dd 0
 
+; xwidget_destroy_component:
+; Destroys a component on a window
+; In\	EAX = Window handle
+; In\	EBX = Component handle
+; Out\	Nothing
+
+xwidget_destroy_component:
+	push eax
+
+	mov edi, ebx
+	xor al, al
+	mov ecx, 256
+	rep stosb
+
+	pop eax
+	call xwidget_redraw
+	ret
 
 

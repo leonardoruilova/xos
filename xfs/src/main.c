@@ -2,6 +2,7 @@
 /* XFS Filesystem Utility */
 
 #include <stdio.h>
+#include <string.h>
 #include "xfs.h"
 
 int main(int argc, char* argv[])

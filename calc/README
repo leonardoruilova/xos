@@ -1,0 +1,1 @@
+This directory contains the source code of the first "real" application for xOS: a calculator. At the moment, it only works with unsigned 32-bit integers, and can add, subtract, multiply and divide. It's also a simple but useful way of debugging libxwidget, the default widget library in xOS.

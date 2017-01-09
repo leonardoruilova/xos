@@ -71,4 +71,18 @@ buttontest:
 				dw 2016
 .reserved2			dw 0
 
+calc:
+
+.filename			db "calc    exe"		; 0
+.reserved1			db 0				; 11
+.lba_sector			dd 4010				; 12
+.size_sectors			dd 10				; 16
+.size_bytes			dd 512*10			; 20
+.time				db 0
+				db 0
+.date				db 5
+				db 1
+				dw 2016
+.reserved2			dw 0
+
 

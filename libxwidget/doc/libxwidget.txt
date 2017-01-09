@@ -9,9 +9,11 @@ The "public" libxwidget functions that are meant to be used by programs are docu
 	* xwidget_destroy
 	* xwidget_get_version
 	* xwidget_create_window
+	* xwidget_redraw
 	* xwidget_wait_event
 	* xwidget_create_button
 	* xwidget_create_label
+	* xwidget_destroy_component
 
 	*	*	*
 	*	*	*
@@ -66,6 +68,17 @@ Return value:
 	*	*	*
 	*	*	*
 
+* xwidget_redraw:
+Description: This function refreshes all components of the window.
+Parameters:
+	EAX	=	Window handle (libxwidget handle.)
+
+Return value:
+	None.
+
+	*	*	*
+	*	*	*
+
 * xwidget_wait_event:
 Description: This function waits for an event to happen on one of the components present on any one of the windows present.
 Parameters:
@@ -104,7 +117,16 @@ Parameters:
 Return value:
 	EAX	=	Component handle of the label, -1 on error.
 
+	*	*	*
+	*	*	*
 
+* xwidget_destroy_component:
+Description: This function destroys a component in a window.
+Parameters:
+	EAX	=	Window handle (libxwidget handle.)
+	EBX	=	Component handle.
 
+Return value:
+	None.
 
 

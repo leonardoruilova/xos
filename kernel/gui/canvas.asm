@@ -110,6 +110,7 @@ wm_clear:
 ; Out\	Nothing
 
 wm_render_char:
+	cli
 	and esi, 0xFFFFFF
 	mov [.fg], esi
 	mov [.handle], eax
