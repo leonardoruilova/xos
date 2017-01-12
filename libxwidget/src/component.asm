@@ -96,7 +96,7 @@ xwidget_redraw:
 	mov bx, 32
 	mov cx, [edi+5]
 	mov dx, [edi+7]
-	mov esi, 0xC0C0C0
+	mov esi, 0xD0D0D0
 	mov edi, [.handle]
 	call xwidget_fill_rect
 

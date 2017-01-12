@@ -41,107 +41,107 @@ main:
 	mov eax, [window_handle]
 	mov cx, 4
 	mov dx, 32
-	mov esi, text1
+	mov esi, text7
 	call xwidget_create_button
-	mov [button1_handle], eax
+	mov [button7_handle], eax
 
 	mov eax, [window_handle]
 	mov cx, 4+32+8+4
 	mov dx, 32
-	mov esi, text2
+	mov esi, text8
 	call xwidget_create_button
-	mov [button2_handle], eax
+	mov [button8_handle], eax
 
 	mov eax, [window_handle]
 	mov cx, 4+32+8+4+32+8+4
 	mov dx, 32
-	mov esi, text3
+	mov esi, text9
 	call xwidget_create_button
-	mov [button3_handle], eax
+	mov [button9_handle], eax
 
 	mov eax, [window_handle]
 	mov cx, 4+32+8+4+32+8+4+32+8+4
 	mov dx, 32
+	mov esi, text_plus
+	call xwidget_create_button
+	mov [plus_handle], eax
+
+	mov eax, [window_handle]
+	mov cx, 4
+	mov dx, 32+32+4
 	mov esi, text4
 	call xwidget_create_button
 	mov [button4_handle], eax
 
 	mov eax, [window_handle]
-	mov cx, 4
+	mov cx, 4+32+8+4
 	mov dx, 32+32+4
 	mov esi, text5
 	call xwidget_create_button
 	mov [button5_handle], eax
 
 	mov eax, [window_handle]
-	mov cx, 4+32+8+4
+	mov cx, 4+32+8+4+32+8+4
 	mov dx, 32+32+4
 	mov esi, text6
 	call xwidget_create_button
 	mov [button6_handle], eax
 
 	mov eax, [window_handle]
-	mov cx, 4+32+8+4+32+8+4
-	mov dx, 32+32+4
-	mov esi, text7
-	call xwidget_create_button
-	mov [button7_handle], eax
-
-	mov eax, [window_handle]
 	mov cx, 4+32+8+4+32+8+4+32+8+4
 	mov dx, 32+32+4
-	mov esi, text8
+	mov esi, text_minus
 	call xwidget_create_button
-	mov [button8_handle], eax
+	mov [minus_handle], eax
 
 	mov eax, [window_handle]
 	mov cx, 4
 	mov dx, 32+32+4+32+4
-	mov esi, text9
+	mov esi, text1
 	call xwidget_create_button
-	mov [button9_handle], eax
+	mov [button1_handle], eax
 
 	mov eax, [window_handle]
 	mov cx, 4+32+8+4
 	mov dx, 32+32+4+32+4
+	mov esi, text2
+	call xwidget_create_button
+	mov [button2_handle], eax
+
+	mov eax, [window_handle]
+	mov cx, 4+32+8+4+32+8+4
+	mov dx, 32+32+4+32+4
+	mov esi, text3
+	call xwidget_create_button
+	mov [button3_handle], eax
+
+	mov eax, [window_handle]
+	mov cx, 4+32+8+4+32+8+4+32+8+4
+	mov dx, 32+32+4+32+4
+	mov esi, text_mul
+	call xwidget_create_button
+	mov [mul_handle], eax
+
+	mov eax, [window_handle]
+	mov cx, 4
+	mov dx, 32+32+4+32+4+32+4
+	mov esi, textc
+	call xwidget_create_button
+	mov [c_handle], eax
+
+	mov eax, [window_handle]
+	mov cx, 4+32+8+4
+	mov dx, 32+32+4+32+4+32+4
 	mov esi, text0
 	call xwidget_create_button
 	mov [button0_handle], eax
 
 	mov eax, [window_handle]
 	mov cx, 4+32+8+4+32+8+4
-	mov dx, 32+32+4+32+4
-	mov esi, textc
-	call xwidget_create_button
-	mov [c_handle], eax
-
-	mov eax, [window_handle]
-	mov cx, 4+32+8+4+32+8+4+32+8+4
-	mov dx, 32+32+4+32+4
+	mov dx, 32+32+4+32+4+32+4
 	mov esi, text_equal
 	call xwidget_create_button
 	mov [equal_handle], eax
-
-	mov eax, [window_handle]
-	mov cx, 4
-	mov dx, 32+32+4+32+4+32+4
-	mov esi, text_plus
-	call xwidget_create_button
-	mov [plus_handle], eax
-
-	mov eax, [window_handle]
-	mov cx, 4+32+8+4
-	mov dx, 32+32+4+32+4+32+4
-	mov esi, text_minus
-	call xwidget_create_button
-	mov [minus_handle], eax
-
-	mov eax, [window_handle]
-	mov cx, 4+32+8+4+32+8+4
-	mov dx, 32+32+4+32+4+32+4
-	mov esi, text_mul
-	call xwidget_create_button
-	mov [mul_handle], eax
 
 	mov eax, [window_handle]
 	mov cx, 4+32+8+4+32+8+4+32+8+4
