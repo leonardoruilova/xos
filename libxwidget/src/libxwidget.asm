@@ -4,6 +4,15 @@
 
 use32
 
+	; Change These Variables To Suit Yourself
+	align 4
+	xwidget_window_color	dd 0xE8E8E8
+	xwidget_button_color	dd 0xC8C8C8
+	xwidget_textbox_bg	dd 0xFFFFFF
+	xwidget_textbox_fg	dd 0x000000
+	xwidget_outline_focus	dd 0x00A2E8
+	xwidget_outline		dd 0x000000
+
 	XWIDGET_MAX_WINDOWS	= 8	; for now
 
 	; Window Event Bitfield from the Kernel
@@ -20,6 +29,7 @@ use32
 	include			"libxwidget/src/component.asm"	; components
 	include			"libxwidget/src/button.asm"	; button component
 	include			"libxwidget/src/label.asm"	; label component
+	include			"libxwidget/src/textbox.asm"	; textbox component
 
 	; typedef struct window_data_t
 	; {

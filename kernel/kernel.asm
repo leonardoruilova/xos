@@ -269,6 +269,7 @@ idle_process:
 
 	; I/O Device Drivers
 	include "kernel/iodev/ps2.asm"		; PS/2 keyboard/mouse driver
+	include "kernel/keymaps/en-us.asm"	; en-US ASCII mappings
 
 	; Block Device Drivers
 	include "kernel/blkdev/blkdev.asm"	; Generic storage device interface

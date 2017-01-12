@@ -8,6 +8,7 @@ use32
 	XWIDGET_NONE		= 0x00
 	XWIDGET_BUTTON		= 0x01
 	XWIDGET_LABEL		= 0x02
+	XWIDGET_TEXTBOX		= 0x03
 
 ; xwidget_find_component:
 ; Finds a free component
@@ -62,7 +63,7 @@ xwidget_redraw:
 	; first clear the window
 	mov ebp, XOS_WM_CLEAR
 	mov eax, [.handle]
-	mov ebx, 0xFFFFFF
+	mov ebx, [xwidget_window_color]
 	int 0x60
 
 	; now start going through the components
@@ -96,7 +97,7 @@ xwidget_redraw:
 	mov bx, 32
 	mov cx, [edi+5]
 	mov dx, [edi+7]
-	mov esi, 0xD0D0D0
+	mov esi, [xwidget_button_color]
 	mov edi, [.handle]
 	call xwidget_fill_rect
 

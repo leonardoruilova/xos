@@ -11,6 +11,21 @@ PS2_KBD_SET_SCANCODE		= 0xF0
 PS2_KBD_ENABLE_MB		= 0xFA
 PS2_KBD_ENABLE			= 0xF4
 PS2_KBD_DISABLE			= 0xF5
+PS2_KBD_SET_LEDS		= 0xED
+
+; PS/2 Keyboard LEDs Bitfield
+PS2_KBD_SCROLL_LOCK		= 0x01
+;PS2_KBD_NUM_LOCK		= 0x02	; someday I'll add support for NumLock
+PS2_KBD_CAPS_LOCK		= 0x04
+
+; Some "Control" Keys
+LEFT_SHIFT			= 0x36
+RIGHT_SHIFT			= 0x2A
+CAPS_LOCK			= 0x3A
+
+; Keyboard Status Bitfield
+KBD_STATUS_SHIFT		= 0x01
+KBD_STATUS_CAPS_LOCK		= 0x02
 
 ; PS/2 Mouse Commands
 PS2_MOUSE_COMMAND		= 0xD4
@@ -32,6 +47,12 @@ MOUSE_X_SIGN			= 0x10
 MOUSE_Y_SIGN			= 0x20
 MOUSE_X_OVERFLOW		= 0x40
 MOUSE_Y_OVERFLOW		= 0x80
+
+; Keyboard Stuff
+kbd_status			db 0
+kbd_leds			db 0
+last_scancode			db 0
+last_character			db 0
 
 ; Mouse Speed
 mouse_speed			db 0		; 0 normal speed, 1 -> 4 fast speeds
@@ -157,6 +178,8 @@ ps2_kbd_init:
 	mov ebp, ps2_kbd_irq		; irq handler
 	call install_isr
 
+	mov [kbd_status], 0
+
 	; reset
 	mov al, PS2_KBD_RESET
 	call ps2_send
@@ -173,6 +196,10 @@ ps2_kbd_init:
 	mov al, 2
 	call ps2_send
 
+	; turn off all the LEDs
+	mov al, 0
+	call ps2_kbd_set_leds
+
 	; enable keyboard
 	mov al, PS2_KBD_ENABLE
 	call ps2_send
@@ -185,18 +212,140 @@ ps2_kbd_init:
 	call irq_unmask
 	ret
 
-; ps2_kbd_irq:
-; PS/2 Keyboard IRQ Handler
-
-ps2_kbd_irq:
+; ps2_kbd_set_leds:
+; Sets the LEDs of the PS/2 keyboard
+; In\	AL = LED bitfield
+; Out\	Nothing
+align 32
+ps2_kbd_set_leds:
 	push eax
 
-	in al, 0x60
+	mov al, PS2_KBD_SET_LEDS
+	call ps2_send
 
+	pop eax
+	push eax
+	call ps2_send
+
+	pop eax
+	mov [kbd_leds], al
+	ret
+
+; ps2_kbd_irq:
+; PS/2 Keyboard IRQ Handler
+align 32
+ps2_kbd_irq:
+	pusha
+
+	in al, 0x60		; read the scancode
+
+	; check for control keys
+	cmp al, LEFT_SHIFT
+	je .turn_on_shift
+
+	cmp al, RIGHT_SHIFT
+	je .turn_on_shift
+
+	cmp al, LEFT_SHIFT or 0x80	; was the left shift released?
+	je .turn_off_shift
+
+	cmp al, RIGHT_SHIFT or 0x80	; right shift released?
+	je .turn_off_shift
+
+	cmp al, CAPS_LOCK		; caps lock?
+	je .toggle_caps_lock
+
+	; now the key is most likely a letter or number...
+	; soon I'll add support for NumLock and the numpad
+	; but for now, we'll assume it's a "printable" character
+	test al, 0x80		; key released?
+	jnz .finish		; ignore it
+
+	and eax, 0x7F
+	mov [last_scancode], al
+
+	; depending on shift and caps lock state, use the appropriate key mapping
+	cmp [kbd_status], 0
+	je .normal
+
+	cmp [kbd_status], KBD_STATUS_SHIFT
+	je .shift
+
+	cmp [kbd_status], KBD_STATUS_CAPS_LOCK
+	je .caps_lock
+
+	cmp [kbd_status], KBD_STATUS_SHIFT or KBD_STATUS_CAPS_LOCK
+	je .shift_caps_lock
+
+.normal:
+	add eax, ascii_codes
+	mov al, [eax]
+	mov [last_character], al
+	call wm_kbd_event
+	jmp .finish
+
+.shift:
+	add eax, ascii_codes_shift
+	mov al, [eax]
+	mov [last_character], al
+	call wm_kbd_event
+	jmp .finish
+
+.caps_lock:
+	add eax, ascii_codes_caps_lock
+	mov al, [eax]
+	mov [last_character], al
+	call wm_kbd_event
+	jmp .finish
+
+.shift_caps_lock:
+	add eax, ascii_codes_shift_caps_lock
+	mov al, [eax]
+	mov [last_character], al
+	call wm_kbd_event
+	jmp .finish
+
+.turn_on_shift:
+	or [kbd_status], KBD_STATUS_SHIFT
+	jmp .finish
+
+.turn_off_shift:
+	and [kbd_status], not KBD_STATUS_SHIFT
+	jmp .finish
+
+.toggle_caps_lock:
+	test [kbd_status], KBD_STATUS_CAPS_LOCK
+	jz .turn_on_caps_lock
+
+.turn_off_caps_lock:
+	and [kbd_status], not KBD_STATUS_CAPS_LOCK
+	mov al, [kbd_leds]
+	and al, not PS2_KBD_CAPS_LOCK
+	call ps2_kbd_set_leds
+	jmp .finish
+
+.turn_on_caps_lock:
+	or [kbd_status], KBD_STATUS_CAPS_LOCK
+	mov al, [kbd_leds]
+	or al, PS2_KBD_CAPS_LOCK
+	call ps2_kbd_set_leds
+
+.finish:
 	mov al, 0x20
 	out 0x20, al
-	pop eax
+	popa
 	iret
+
+; ps2_kbd_read:
+; Reads from the PS/2 keyboard
+; In\	Nothing
+; Out\	AH = ASCII Scancode
+; Out\	AL = ASCII Character
+
+ps2_kbd_read:
+	mov ah, [last_scancode]
+	mov al, [last_character]
+	ret
 
 ; ps2_mouse_send:
 ; Sends mouse data to the PS/2 mouse
@@ -441,7 +590,7 @@ ps2_mouse_irq:
 	test [mouse_data], MOUSE_LEFT_BTN
 	jz .redraw
 
-	call wm_event
+	call wm_mouse_event
 	jmp .done
 
 .redraw:

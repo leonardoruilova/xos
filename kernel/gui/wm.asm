@@ -727,10 +727,10 @@ align 32
 .framebuffer		dd 0
 .title			dd 0
 
-; wm_event:
-; WM Event Handler
+; wm_mouse_event:
+; WM Mouse Event Handler
 align 32
-wm_event:
+wm_mouse_event:
 	;cli		; sensitive area!
 
 	cmp [wm_running], 0
@@ -879,6 +879,29 @@ wm_event:
 
 align 8
 .handle			dd 0
+
+; wm_kbd_event:
+; WM Keyboard Event Handler
+align 32
+wm_kbd_event:
+	cmp [wm_running], 0
+	je .quit
+
+	; simply send a keypress event to the focused window
+	cmp [open_windows], 0
+	je .quit
+
+	cmp [active_window], -1
+	je .quit
+
+	mov eax, [active_window]
+	shl eax, 7		; mul 128
+	add eax, [window_handles]
+
+	or word[eax+WINDOW_EVENT], WM_KEYPRESS
+
+.quit:
+	ret
 
 ; wm_read_event:
 ; Reads the WM event

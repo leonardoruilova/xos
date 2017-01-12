@@ -22,7 +22,7 @@ ascii_codes:
 	times 128 - ($-ascii_codes) db 0
 
 align 16
-ascii_codes_capslock:
+ascii_codes_caps_lock:
 	db 0,27
 	db "1234567890-=",8
 	db "	"
@@ -33,7 +33,7 @@ ascii_codes_capslock:
 	db " "
 	db 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 	db "-",0,0,0,"+"
-	times 128 - ($-ascii_codes_capslock) db 0
+	times 128 - ($-ascii_codes_caps_lock) db 0
 
 align 16
 ascii_codes_shift:
@@ -50,7 +50,7 @@ ascii_codes_shift:
 	times 128 - ($-ascii_codes_shift) db 0
 
 align 16
-ascii_codes_shift_capslock:
+ascii_codes_shift_caps_lock:
 	db 0,27
 	db "!@#$%^&*()_+",8
 	db "	"
@@ -61,7 +61,7 @@ ascii_codes_shift_capslock:
 	db " "
 	db 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 	db "-",0,0,0,"+"
-	times 128 - ($-ascii_codes_shift_capslock) db 0
+	times 128 - ($-ascii_codes_shift_caps_lock) db 0
 
 
 
