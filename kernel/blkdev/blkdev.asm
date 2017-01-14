@@ -30,6 +30,7 @@ BLKDEV_UNPRESENT		= 0
 BLKDEV_ATA			= 1
 BLKDEV_AHCI			= 2
 BLKDEV_RAMDISK			= 3
+BLKDEV_MEMDISK			= 4
 
 ; Device Content
 BLKDEV_FLAT			= 0
@@ -53,6 +54,7 @@ blkdev_init:
 	mov [blkdev_structure], eax
 
 	; detect devices ;)
+	call memdisk_detect
 	call ata_detect
 	call ahci_detect
 	;call usb_mass_detect
@@ -61,6 +63,11 @@ blkdev_init:
 	; allocate a temporary buffer 512 bytes to read the MBR of each device present
 	; then search for the partition entry which we booted from
 	; it's very unlikely two disks on the same system have identical partitions ;)
+
+	; -- to make this faster: if MEMDISK is present then it is the boot drive
+	cmp [memdisk_phys], 0
+	jne .memdisk
+
 	mov ecx, 512
 	call kmalloc
 	mov [.tmp_buffer], eax
@@ -131,6 +138,25 @@ blkdev_init:
 	mov esi, .no_bootdev_msg
 	jmp early_boot_error
 
+.memdisk:
+	mov [boot_device], 0
+
+	mov esi, .bootdev_msg
+	call kprint
+	mov eax, [boot_device]
+	call int_to_string
+	call kprint
+	mov esi, newline
+	call kprint
+
+	; allocate a disk buffer for use by filesystem drivers
+	mov ecx, DISK_BUFFER_SIZE
+	;call malloc		; when userspace drivers actually exist, then i'll put this memory as userspace
+	call kmalloc
+	mov [disk_buffer], eax
+
+	ret
+
 .tmp_buffer			dd 0
 .current_device			dd 0
 .bootdev_msg			db "Boot device is logical device ",0
@@ -164,6 +190,8 @@ blkdev_register:
 	je .ahci
 	cmp al, BLKDEV_RAMDISK
 	je .ramdisk
+	cmp al, BLKDEV_MEMDISK
+	je .memdisk
 
 .undefined:
 	mov esi, .undefined_msg
@@ -182,6 +210,11 @@ blkdev_register:
 
 .ramdisk:
 	mov esi, .ramdisk_msg
+	call kprint
+	jmp .done
+
+.memdisk:
+	mov esi, .memdisk_msg
 	call kprint
 
 .done:
@@ -202,6 +235,7 @@ blkdev_register:
 .ata_msg		db "ATA device",0
 .ahci_msg		db "AHCI device",0
 .ramdisk_msg		db "ramdisk device",0
+.memdisk_msg		db "memdisk device",0
 .undefined_msg		db "undefined device",0
 .msg2			db ", device number ",0
 
@@ -224,6 +258,11 @@ blkdev_get_buffer:
 ; Out\	AH = Device status (for ATA and AHCI, at least)
 align 32
 blkdev_read:
+	mov [.count], ecx
+	mov [.buffer], edi
+	mov dword[.lba], eax
+	mov dword[.lba+4], edx
+
 	cmp ebx, [blkdevs]	; can't read from a non existant drive
 	jge .fail
 
@@ -231,6 +270,9 @@ blkdev_read:
 	add ebx, [blkdev_structure]
 
 	; give control to device-specific code
+	cmp byte[ebx], BLKDEV_MEMDISK
+	je .memdisk
+
 	cmp byte[ebx], BLKDEV_ATA
 	je .ata
 
@@ -245,10 +287,6 @@ blkdev_read:
 .ata:
 	mov bl, [ebx+BLKDEV_ADDRESS]
 	mov [.ata_drive], bl
-	mov [.count], ecx
-	mov [.buffer], edi
-	mov dword[.lba], eax
-	mov dword[.lba+4], edx
 
 .ata_loop:
 	cmp [.count], 255
@@ -286,6 +324,14 @@ blkdev_read:
 .ahci:
 	mov bl, [ebx+BLKDEV_ADDRESS]	; ahci port
 	call ahci_read
+	ret
+
+.memdisk:
+	mov edx, dword[.lba+4]
+	mov eax, dword[.lba]
+	mov ecx, [.count]
+	mov edi, [.buffer]
+	call memdisk_read
 	ret
 
 .done:

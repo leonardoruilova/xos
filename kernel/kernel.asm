@@ -78,6 +78,7 @@ kmain16:
 	mov cr0, eax
 
 	; do things that are easier to do with BIOS
+	call get_disk_size
 	call detect_memory
 	call enable_a20
 	call check_a20
@@ -273,6 +274,7 @@ idle_process:
 
 	; Block Device Drivers
 	include "kernel/blkdev/blkdev.asm"	; Generic storage device interface
+	include "kernel/blkdev/memdisk.asm"	; Memory-mapped disks from SYSLINUX MEMDISK
 	include "kernel/blkdev/ata.asm"		; ATA driver
 	include "kernel/blkdev/ahci.asm"	; AHCI driver
 
@@ -293,10 +295,13 @@ idle_process:
 	; Default mouse cursor
 	cursor:
 	;file "kernel/gui/themes/cursor_black.bmp"	; choose whichever cursor you like
-	file "kernel/gui/themes/cursor_white.bmp"	; or even make your own; in Paint and GIMP use a 24-bit bitmap
+	;file "kernel/gui/themes/cursor_white.bmp"	; or even make your own; in Paint and GIMP use a 24-bit bitmap
+	file "kernel/gui/themes/cursor_big_blue.bmp"
+
 	; Default bitmap font
 	font:
-	file "kernel/fonts/term.bin"
+	file "kernel/fonts/lite.bin"
+	;file "kernel/fonts/term.bin"
 	;file "kernel/fonts/alotware.bin"
 	;file "kernel/fonts/cp437.bin"
 	;include "kernel/fonts/glaux-mono.asm"
