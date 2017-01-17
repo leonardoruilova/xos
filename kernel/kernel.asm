@@ -294,13 +294,13 @@ idle_process:
 
 	; Default mouse cursor
 	cursor:
-	;file "kernel/gui/themes/cursor_black.bmp"	; choose whichever cursor you like
+	file "kernel/gui/themes/cursor_black.bmp"	; choose whichever cursor you like
 	;file "kernel/gui/themes/cursor_white.bmp"	; or even make your own; in Paint and GIMP use a 24-bit bitmap
-	file "kernel/gui/themes/cursor_big_blue.bmp"
+	;file "kernel/gui/themes/cursor_big_blue.bmp"
 
 	; Default bitmap font
 	font:
-	file "kernel/fonts/lite.bin"
+	file "kernel/fonts/courier.bin"
 	;file "kernel/fonts/term.bin"
 	;file "kernel/fonts/alotware.bin"
 	;file "kernel/fonts/cp437.bin"

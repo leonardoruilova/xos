@@ -43,8 +43,7 @@ vmm_init:
 
 .table_loop:
 	mov eax, ebx
-	or eax, PAGE_PRESENT OR PAGE_USER OR PAGE_WRITEABLE	; only temporarily map the low memory as user
-								; because we're testing multitasking...
+	or eax, PAGE_PRESENT OR PAGE_WRITEABLE
 	stosd
 
 	add ebx, 4096
