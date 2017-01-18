@@ -254,11 +254,13 @@ ahci_identify:
 .loop:
 	sti
 	hlt
-	test dword[edi+AHCI_PORT_COMMAND_ISSUE], 1
-	jz .after_loop
 	test dword[edi+AHCI_PORT_TASK_FILE], 0x01	; error
 	jnz .error
 	test dword[edi+AHCI_PORT_TASK_FILE], 0x20	; drive fault
+	jnz .error
+
+	test dword[edi+AHCI_PORT_COMMAND_ISSUE], 1
+	jz .after_loop
 
 	loop .loop
 	jmp .error
@@ -339,8 +341,6 @@ ahci_read:
 	mov [.count], ecx
 	mov [.buffer], edi
 
-	call ahci_disable_cache
-
 	; ahci uses DMA so we need physical address
 	mov eax, [.buffer]
 	and eax, 0xFFFFF000
@@ -365,18 +365,32 @@ ahci_read:
 	rep stosb
 
 	; make the command list
-	mov [ahci_command_list.cfis_length], 5
+	mov [ahci_command_list.cfis_length], (end_ahci_command_fis-ahci_command_fis+3) / 4
 	mov [ahci_command_list.prdt_length], 1
 	mov dword[ahci_command_list.command_table], ahci_command_table
 
 	; the command FIS
 	mov [ahci_command_fis.fis_type], AHCI_FIS_H2D
 	mov [ahci_command_fis.flags], 0x80
-	mov [ahci_command_fis.command], SATA_READ_LBA28
-	mov [ahci_command_fis.device], 0xE0
 	mov eax, [.count]
 	mov [ahci_command_fis.count], ax
 
+	; determine whether to use LBA28 or LBA48
+	cmp dword[.lba], 0xFFFFFFF-256
+	jge .lba48
+	cmp dword[.lba+4], 0
+	jne .lba48
+
+.lba28:
+	mov [ahci_command_fis.device], 0xE0
+	mov [ahci_command_fis.command], SATA_READ_LBA28
+	jmp .continue
+
+.lba48:
+	mov [ahci_command_fis.device], 0x40
+	mov [ahci_command_fis.command], SATA_READ_LBA48
+
+.continue:
 	; LBA...
 	mov eax, dword[.lba]
 	mov [ahci_command_fis.lba0], al
@@ -387,10 +401,10 @@ ahci_read:
 	shr eax, 8
 	mov [ahci_command_fis.lba3], al
 
-	;mov eax, dword[.lba+4]
-	;mov [ahci_command_fis.lba4], al
-	;shr eax, 8
-	;mov [ahci_command_fis.lba5], al
+	mov eax, dword[.lba+4]
+	mov [ahci_command_fis.lba4], al
+	shr eax, 8
+	mov [ahci_command_fis.lba5], al
 
 	; the PRDT
 	mov eax, [.buffer_phys]
@@ -401,6 +415,7 @@ ahci_read:
 	mov [ahci_prdt.count], eax
 
 	; send the command to the device
+	call ahci_disable_cache
 	movzx edi, [.port]
 	shl edi, 7
 	add edi, AHCI_ABAR_PORT_CONTROL
@@ -415,8 +430,6 @@ ahci_read:
 	mov dword[edi+AHCI_PORT_COMMAND_LIST+4], 0
 
 .wait_bsy:
-	sti
-	hlt
 	test dword[edi+AHCI_PORT_TASK_FILE], 0x80
 	jnz .wait_bsy
 
@@ -427,11 +440,13 @@ ahci_read:
 .loop:
 	sti
 	hlt
-	test dword[edi+AHCI_PORT_COMMAND_ISSUE], 1
-	jz .after_loop
 	test dword[edi+AHCI_PORT_TASK_FILE], 0x01	; error
 	jnz .error
 	test dword[edi+AHCI_PORT_TASK_FILE], 0x20	; drive fault
+	jnz .error
+
+	test dword[edi+AHCI_PORT_COMMAND_ISSUE], 1
+	jz .after_loop
 
 	loop .loop
 	jmp .error
@@ -457,8 +472,17 @@ ahci_read:
 	cmp [ahci_command_list.prdt_byte_count], eax
 	jne .error
 
+	movzx edi, [.port]
+	shl edi, 7
+	add edi, AHCI_ABAR_PORT_CONTROL
+	add edi, [ahci_abar]
+
+	mov ebx, [edi+AHCI_PORT_TASK_FILE]
+	mov [.task_file], bl
+
 	call ahci_enable_cache
-	mov eax, 0
+	mov al, 0
+	mov ah, [.task_file]
 	ret
 
 .error:
