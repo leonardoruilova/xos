@@ -24,15 +24,11 @@ all:
 	gcc -c xfs/src/xfs.c -o out/xfs/xfs.o
 	gcc out/xfs/*.o -o ./xfs/xfs
 
-testing:
-	if [ ! -d "out" ]; then mkdir out; fi
-	fasm kernel/kernel.asm out/kernel32.sys
-	fasm buttontest/buttontest.asm out/buttontest.exe
-	dd if=out/kernel32.sys conv=notrunc bs=512 seek=200 of=disk.hdd
-	dd if=out/buttontest.exe conv=notrunc bs=512 seek=4002 of=disk.hdd
-
 run:
-	qemu-system-i386 -hda disk.hdd -m 128 -vga std
+	qemu-system-i386 -hda disk.hdd -m 128 -vga std -serial stdio -usb
+
+runsata:
+	qemu-system-i386 -m 128 -vga std -serial stdio -device ahci,id=ahci -drive if=none,file=disk.hdd,id=xosdrive -device ide-drive,drive=xosdrive,bus=ahci.0
 
 clean:
 	if [ -d "out/xfs" ]; then rm out/xfs/*; rmdir out/xfs; fi

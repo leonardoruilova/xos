@@ -190,15 +190,16 @@ kmain32:
 	call mm_init
 	call pic_init
 	call pit_init
-	call ps2_init
 	call syscall_init
 	call tasking_init
 	call acpi_init
 	call acpi_aml_init
 	;call apic_init
 	call pci_init
+	call usb_init
 	call blkdev_init
 	call xfs_detect
+	call ps2_init
 	call wm_init
 	call use_back_buffer
 	call unlock_screen
@@ -291,6 +292,13 @@ idle_process:
 	; Filesystem
 	include "kernel/fs/xfs.asm"		; XFS
 	;include "kernel/fs/iso9660.asm"	; ISO9660 will be here someday
+
+	; USB and nice stuff
+	include "kernel/usb/usb.asm"		; Generic USB interface
+	include "kernel/usb/uhci.asm"		; USB 1.0 (UHCI)
+	;include "kernel/usb/ohci.asm"		; USB 1.0 (OHCI)
+	;include "kernel/usb/ehci.asm"		; USB 2.0 (EHCI)
+	;include "kernel/usb/xhci.asm"		; USB 3.0 (xHCI)
 
 	; Default mouse cursor
 	cursor:

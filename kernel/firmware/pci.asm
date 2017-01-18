@@ -4,10 +4,30 @@
 
 use32
 
+;
+;
+; struct pci_device
+; {
+;	u8 bus;
+;	u8 slot;
+;	u8 function
+;	u8 reserved;
+; }
+;
+;
+; sizeof(pci_device) = 4;
+;
+
+PCI_DEVICE_BUS		= 0x00
+PCI_DEVICE_SLOT		= 0x01
+PCI_DEVICE_FUNCTION	= 0x02
+PCI_DEVICE_RESERVED	= 0x03
+PCI_DEVICE_SIZE		= 0x04
+
 ; Maximum Buses/Device/Functions
 PCI_MAX_BUS		= 255	; 256 buses
-PCI_MAX_DEV		= 31	; up to 32 devices per bus
-PCI_MAX_FUNCTION	= 7	; up to 7 functions per device
+PCI_MAX_SLOT		= 31	; up to 32 devices per bus
+PCI_MAX_FUNCTION	= 7	; up to 8 functions per device
 
 ; PCI Configuration Registers
 PCI_DEVICE_VENDOR	= 0x00
@@ -145,7 +165,7 @@ pci_init:
 	je .done
 
 	inc [.device]
-	cmp [.device], PCI_MAX_DEV
+	cmp [.device], PCI_MAX_SLOT
 	jg .next_bus
 	jmp .loop
 
@@ -223,7 +243,7 @@ pci_get_device_class:
 .next_device:
 	mov [.function], 0
 	inc [.device]
-	cmp [.device], PCI_MAX_DEV
+	cmp [.device], PCI_MAX_SLOT
 	jg .next_bus
 	jmp .find_device
 
@@ -294,7 +314,7 @@ pci_get_device_class_progif:
 .next_device:
 	mov [.function], 0
 	inc [.device]
-	cmp [.device], PCI_MAX_DEV
+	cmp [.device], PCI_MAX_SLOT
 	jg .next_bus
 	jmp .find_device
 
@@ -364,7 +384,7 @@ pci_get_device_vendor:
 .next_device:
 	mov [.function], 0
 	inc [.device]
-	cmp [.device], PCI_MAX_DEV
+	cmp [.device], PCI_MAX_SLOT
 	jle .find_device
 
 .next_bus:
@@ -527,6 +547,107 @@ pci_map_memory:
 .done_msg3			db ", mapped at 0x",0
 .done_msg4			db " -> 0x",0
 
+; pci_generate_list:
+; Generates a device list
+; In\	AH = Class
+; In\	AL = Subclass
+; In\	BL = Progamming interface
+; Out\	EAX = Pointer to list, only valid if ECX != 0
+; Out\	ECX = Size of list in entries, 0 if not found
+
+pci_generate_list:
+	mov [.class], ax
+	mov [.progif], bl
+
+	mov ecx, 4096
+	call kmalloc
+
+	mov [.return], eax
+	mov [.pointer_return], eax
+
+	mov [.bus], 0
+	mov [.slot],0
+	mov [.function], 0
+	mov [.count], 0
+
+.loop:
+	mov al, [.bus]
+	mov ah, [.slot]
+	mov bl, [.function]
+	mov bh, PCI_CLASS
+	call pci_read_dword
+
+	push eax
+	shr eax, 16
+	cmp ax, [.class]
+	pop eax
+	jne .next
+
+	;pop eax
+	shr eax, 8
+	cmp al, [.progif]
+	jne .next
+
+	mov edi, [.pointer_return]
+	mov al, [.bus]
+	stosb
+	mov al, [.slot]
+	stosb
+	mov al, [.function]
+	stosb
+	xor al, al
+	stosb
+
+	mov [.pointer_return], edi
+	inc [.count]
+
+.next:
+	inc [.function]
+	cmp [.function], PCI_MAX_FUNCTION
+	jge .next_slot
+
+	jmp .loop
+
+.next_slot:
+	mov [.function], 0
+	inc [.slot]
+	cmp [.slot], PCI_MAX_SLOT
+	jge .next_bus
+
+	jmp .loop
+
+.next_bus:
+	mov [.slot], 0
+	inc [.bus]
+	cmp [.bus], PCI_MAX_BUS
+	jge .finish
+
+	jmp .loop
+
+.finish:
+	cmp [.count], 0
+	je .no
+
+	mov eax, [.return]
+	mov ecx, [.count]
+	ret
+
+.no:
+	mov eax, [.return]
+	call kfree
+
+	xor ecx, ecx
+	xor eax, eax
+	ret
+
+.return			dd 0
+.pointer_return		dd 0
+.count			dd 0
+.class			dw 0
+.progif			db 0
+.bus			db 0
+.slot			db 0
+.function		db 0
 
 
 
