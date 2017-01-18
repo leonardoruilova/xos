@@ -39,15 +39,19 @@ AHCI_PORT_FIS_CONTROL		= 0x0040
 AHCI_PORT_RESERVED1		= 0x0044
 AHCI_PORT_VENDOR_SPECIFIC	= 0x0070
 
+; FIS Types
+AHCI_FIS_H2D			= 0x27
+AHCI_FIS_D2H			= 0x34
+
 ; Command Set
 SATA_IDENTIFY			= 0xEC
-SATA_READ_LBA28			= 0x20
-SATA_READ_LBA48			= 0x24
-SATA_WRITE_LBA28		= 0x30
-SATA_WRITE_LBA48		= 0x34
+SATA_READ_LBA28			= 0xC8
+SATA_READ_LBA48			= 0x25
+SATA_WRITE_LBA28		= 0xCA
+SATA_WRITE_LBA48		= 0x35
 
 pci_ahci_bus			db 0
-pci_ahci_dev			db 0
+pci_ahci_slot			db 0
 pci_ahci_function		db 0
 
 align 4
@@ -55,28 +59,31 @@ ahci_abar			dd 0
 ;ahci_port_count		db 0	; counts how many ports are present
 
 ; ahci_detect:
-; Detects AHCI devices
+; Detects a AHCI controller
 
 ahci_detect:
-	mov ax, 0x0106		; ahci controller
+	mov esi, .starting_msg
+	call kprint
+
+	mov ax, 0x0106
 	call pci_get_device_class
 
+	cmp al, 0xFF
+	je .no
+
 	mov [pci_ahci_bus], al
-	mov [pci_ahci_dev], ah
+	mov [pci_ahci_slot], ah
 	mov [pci_ahci_function], bl
 
-	cmp [pci_ahci_bus], 0xFF
-	je .no_ahci
-
-	; debugging output
-	mov esi, .pci_msg
+	mov esi, .found_msg
 	call kprint
+
 	mov al, [pci_ahci_bus]
 	call hex_byte_to_string
 	call kprint
 	mov esi, .colon
 	call kprint
-	mov al, [pci_ahci_dev]
+	mov al, [pci_ahci_slot]
 	call hex_byte_to_string
 	call kprint
 	mov esi, .colon
@@ -87,35 +94,52 @@ ahci_detect:
 	mov esi, newline
 	call kprint
 
-	; let the device respond to MMIO access and perform DMA
+	; map the AHCI memory
 	mov al, [pci_ahci_bus]
-	mov ah, [pci_ahci_dev]
+	mov ah, [pci_ahci_slot]
+	mov bl, [pci_ahci_function]
+	mov dl, 5		; bar5
+	call pci_map_memory
+
+	cmp eax, 0
+	je .no_memory
+
+	mov [ahci_abar], eax
+
+	; enable MMIO, DMA, disable IRQs
+	mov al, [pci_ahci_bus]
+	mov ah, [pci_ahci_slot]
 	mov bl, [pci_ahci_function]
 	mov bh, PCI_STATUS_COMMAND
 	call pci_read_dword
 
+	or eax, 0x406
+	;or eax, 6
+
 	mov edx, eax
-	or edx, 6	; bus master | MMIO
-	;call pci_write_dword
-
-	; map the ahci abar to virtual memory
 	mov al, [pci_ahci_bus]
-	mov ah, [pci_ahci_dev]
+	mov ah, [pci_ahci_slot]
 	mov bl, [pci_ahci_function]
-	mov dl, 5		; bar5
-	call pci_map_memory
-	cmp eax, 0
-	je .no_memory
-	mov [ahci_abar], eax
+	mov bh, PCI_STATUS_COMMAND
+	call pci_write_dword
 
-	call ahci_do_handoff		; tell the bios to let go of the ahci controller
-					; QEMU and VBox don't support this; but maybe some real HW need it?
-	call ahci_detect_devices	; detect ahci devices
+	mov [.port], 0
 
+.loop:
+	mov bl, [.port]
+	call ahci_identify
+
+	inc [.port]
+	cmp [.port], 31
+	jg .finish
+
+	jmp .loop
+
+.finish:
 	ret
 
-.no_ahci:
-	mov esi, .no_ahci_msg
+.no:
+	mov esi, .no_msg
 	call kprint
 	ret
 
@@ -124,513 +148,236 @@ ahci_detect:
 	call kprint
 	ret
 
-.pci_msg			db "AHCI controller at PCI slot ",0
+.starting_msg			db "ahci: detecting AHCI controller...",10,0
+.no_msg				db "ahci: AHCI controller not present.",10,0
+.found_msg			db "ahci: found AHCI controller on PCI slot ",0
 .colon				db ":",0
-.no_ahci_msg			db "PCI AHCI controller not present.",10,0
-.no_memory_msg			db "Failed to map AHCI ABAR in memory.",10,0
+.no_memory_msg			db "ahci: insufficient memory.",10,0
+.port				db 0
 
-; ahci_do_handoff:
-; Performs the BIOS handoff on the AHCI controller
+; ahci_disable_cache:
+; Disables caching
 
-ahci_do_handoff:
-	mov eax, [ahci_abar]
-	add eax, AHCI_ABAR_HOST_CAP
-	mov eax, [eax]
-
-	test eax, 1			; controller supports BIOS handoff?
-	jz .no_handoff
-
-	; if the controller supports handoff, check if the handoff has already been done
-	mov eax, [ahci_abar]
-	add eax, AHCI_ABAR_HANDOFF
-	mov edx, [eax]
-
-	test edx, 2
-	jnz .already_handoff
-
-	mov edx, 2
-	mov [eax], edx		; request bios handoff
-
-	mov ecx, 100000		; use this as a timeout
-
-.wait_for_bios:
-	mov edx, [eax]
-	test edx, 0x10		; BIOS busy?
-	jz .check
-
-	pause
-
-	loop .wait_for_bios
-	jmp .timeout
-
-.check:
-	mov edx, [eax]
-	test edx, 2
-	jz .fail
-
-	mov esi, .done_msg
-	call kprint
+ahci_disable_cache:
+	wbinvd
+	mov eax, cr0
+	or eax, 0x60000000
+	mov cr0, eax
 	ret
 
-.timeout:
-	mov esi, .timeout_msg
-	call kprint
-	mov esi, .still_trying_msg
-	call kprint
+; ahci_enable_cache:
+; Enables caching
+
+ahci_enable_cache:
+	wbinvd
+	mov eax, cr0
+	and eax, not 0x60000000
+	mov cr0, eax
 	ret
 
-.fail:
-	mov esi, .fail_msg
-	call kprint
-	mov esi, .still_trying_msg
-	call kprint
-	ret
-
-.already_handoff:
-	mov esi, .already_handoff_msg
-	call kprint
-	ret
-
-.no_handoff:
-	mov esi, .no_handoff_msg
-	call kprint
-	ret
-
-.no_handoff_msg			db "AHCI handoff not supported.",10,0
-.done_msg			db "AHCI handoff succeeded.",10,0
-.already_handoff_msg		db "AHCI handoff already pre-configured.",10,0
-.timeout_msg			db "AHCI handoff failed: operation timed out.",10,0
-.fail_msg			db "AHCI handoff failed: controller is not responding, firmware bug maybe?",10,0
-.still_trying_msg		db "Going to try to initialize AHCI anyway...",10,0
-
-; ahci_check_port:
-; Checks precense of an AHCI port
-; In\	DL = Port number
-; Out\	EFLAGS.CF = 0 if port is present
-; Out\	EAX = Device signature; valid only if EFLAGS.CF = 0
-
-ahci_check_port:
-	mov cl, dl
-	and cl, 0x1F
-	mov eax, 1
-	shl eax, cl
-
-	mov esi, [ahci_abar]
-	add esi, AHCI_ABAR_PORTS	; port implementation bitfield
-	test [esi], eax
-	jz .no
-
-	and edx, 0x1F			; maximum 32 ports
-	mov [.port], dl
-	shl edx, 7
-	add edx, AHCI_ABAR_PORT_CONTROL
-	add edx, [ahci_abar]
-	mov eax, [edx+AHCI_PORT_SIGNATURE]
-	mov [.signature], eax
-	cmp eax, 0xFFFFFFFF		; no device present?
-	je .no
-
-	mov esi, .msg
-	call kprint
-	movzx eax, [.port]
-	call int_to_string
-	call kprint
-	mov esi, .msg2
-	call kprint
-	mov eax, [.signature]
-	call hex_dword_to_string
-	call kprint
-	mov esi, .msg3
-	call kprint
-	mov eax, [.signature]
-	call ahci_print_dev_type
-	mov esi, newline
-	call kprint
-
-	clc
-	mov eax, [.signature]
-	ret
-
-.no:
-	xor eax, eax
-	stc
-	ret
-
-.port			db 0
-.signature		dd 0
-.msg			db "AHCI port ",0
-.msg2			db " has device signature 0x",0
-.msg3			db " -> ",0
-
-; ahci_print_dev_type:
-; Prints a device type based on its signature
-; In\	EAX = Device signature
+; ahci_identify:
+; Identifies an AHCI device
+; In\	BL = Port Number
 ; Out\	Nothing
 
-ahci_print_dev_type:
-	cmp eax, 0x00000101
-	je .sata
+ahci_identify:
+	mov [.port], bl
 
-	cmp eax, 0xEB140101
-	je .satapi
+	call ahci_disable_cache
 
-	cmp eax, 0xC33C0101
-	je .enclosure
+	mov cl, [.port]
+	mov eax, 1
+	shl eax, cl
+	test dword[ahci_abar+AHCI_ABAR_PORTS], eax
+	jz .quit
 
-	cmp eax, 0x96690101
-	je .multiplier
-
-	cmp eax, 0xFFFFFFFF
-	je .nothing
-
-.unknown:
-	mov esi, .unknown_msg
-	call kprint
-	ret
-
-.sata:
-	mov esi, .sata_msg
-	call kprint
-	ret
-
-.satapi:
-	mov esi, .satapi_msg
-	call kprint
-	ret
-
-.enclosure:
-	mov esi, .enclosure_msg
-	call kprint
-	ret
-
-.multiplier:
-	mov esi, .multiplier_msg
-	call kprint
-	ret
-
-.nothing:
-	mov esi, .nothing_msg
-	call kprint
-	ret
-
-.unknown_msg			db "undefined device signature.",0
-.sata_msg			db "SATA device.",0
-.satapi_msg			db "SATAPI device.",0
-.enclosure_msg			db "enclosure management bridge.",0
-.multiplier_msg			db "port multiplier.",0
-.nothing_msg			db "no device present.",0
-
-; ahci_detect_devices:
-; Detects AHCI device ports
-
-ahci_detect_devices:
-
-.loop:
-	mov dl, [.port]
-	call ahci_check_port
-	jc .next_port
-
-	cmp eax, 0x00000101		; sata device?
-	jne .next_port
-
-	; if the device is sata, identify it
-	mov bl, [.port]
-	mov edi, sata_identify_data
-	call sata_identify
-
-.next_port:
-	inc [.port]
-	cmp [.port], 31
-	jg .done
-	jmp .loop
-
-.done:
-	ret
-
-.port			db 0
-
-; sata_identify:
-; Identifies a SATA device
-; In\	DL = AHCI Port Number
-; In\	EDI = 512-byte buffer to store data
-; Out\	EFLAGS.CF = 0 on success
-
-sata_identify:
-	mov [.port], dl
-	mov [.buffer], edi
-
-	; set up the command list
-	mov edi, ahci_command_list
-	mov ecx, end_of_ahci_command_list-ahci_command_list
-	mov eax, 0
-	rep stosb
-
-	mov [ahci_command_list.command_information], 0x10
-	mov [ahci_command_list.prdt_length], 1
-	mov dword[ahci_command_list.command_table], ahci_command_table
-
-	; and the FIS
-	mov edi, ahci_fis
-	mov ecx, end_of_ahci_fis-ahci_fis
-	mov eax, 0
-	rep stosb
-
-	mov [ahci_dma_fis.fis_type], 0x41
-	mov [ahci_pio_fis.fis_type], 0x5F
-	mov [ahci_register_fis.fis_type], 0x34
-	mov [ahci_device_bits_fis.fis_type], 0xA1
-
-	; set up the command table
-	mov edi, ahci_command_table
-	mov ecx, end_of_ahci_command_table-ahci_command_table
-	mov eax, 0
-	rep stosb
-
-	; now set up the command FIS
-	mov [ahci_command_fis.fis_type], 0x27
-	mov [ahci_command_fis.command], 0x80			; we're sending a command
-	mov [ahci_command_fis.command_byte], SATA_IDENTIFY	; ata identify command
-	mov [ahci_command_fis.device], 0xA0
-	mov [ahci_command_fis.count], 1
-
-	; now set up the PRDT
-	; because AHCI uses DMA, all addresses must be ***PHYSICAL***
-	mov eax, [.buffer]
-	call vmm_get_page
-	cmp eax, 0
-	je .error
-	test dl, PAGE_PRESENT
-	jz .error
-
-	mov edx, [.buffer]
-	and edx, 0xFFF
-	add eax, edx
-
-	mov dword[ahci_prdt.memory], eax
-	mov [ahci_prdt.byte_count], 512		; 512 bytes; don't interrupt on completion
-
-	; device control registers
 	movzx edi, [.port]
-	and edi, 0x1F
 	shl edi, 7
 	add edi, AHCI_ABAR_PORT_CONTROL
 	add edi, [ahci_abar]
 
-.wait_for_bsy:
-	; first ensure the device is not busy
-	test dword[edi+AHCI_PORT_TASK_FILE], 0x80
-	jnz .wait_for_bsy
+	mov eax, [edi+AHCI_PORT_SIGNATURE]
+	cmp eax, 0x0101		; SATA?
+	jne .quit
 
-	;test dword[edi+AHCI_PORT_TASK_FILE], 0x08
-	;jnz .wait_for_bsy
+	; if it's SATA, identify the drive
+	; clear all nescessary structures
+	mov edi, ahci_command_list
+	mov ecx, end_ahci_command_list - ahci_command_list
+	xor al, al
+	rep stosb
 
-	; now we know the device is not busy; turn off command execution
-	and dword[edi+AHCI_PORT_COMMAND], 0xFFFFFFFE
-	mov dword[edi+AHCI_PORT_COMMAND_ISSUE], 0
-	wbinvd
+	mov edi, ahci_command_table
+	mov ecx, end_ahci_command_table - ahci_command_table
+	xor al, al
+	rep stosb
 
-	mov ecx, 100000		; timeout
+	; make the command list
+	mov [ahci_command_list.cfis_length], (end_ahci_command_fis-ahci_command_fis+3) / 4
+	mov [ahci_command_list.prdt_length], 1
+	mov dword[ahci_command_list.command_table], ahci_command_table
 
-.wait_for_idle:
-	pause
-	dec ecx
-	cmp ecx, 0
-	je .error
-	test dword[edi+AHCI_PORT_COMMAND], 1	; is the device ready to execute command?
-	jnz .wait_for_idle			; it shouldn't be; we just disabled it
-	cmp dword[edi+AHCI_PORT_COMMAND_ISSUE], 0
-	jne .wait_for_idle
+	; the command FIS
+	mov [ahci_command_fis.fis_type], AHCI_FIS_H2D
+	mov [ahci_command_fis.flags], 0x80
+	mov [ahci_command_fis.command], SATA_IDENTIFY	; 0xEC
+	;mov [ahci_command_fis.count], 1
 
-	; send the FIS and command list to the device
+	; the PRDT
+	mov dword[ahci_prdt.base], sata_identify_data
+	mov [ahci_prdt.count], 511
+
+	; send the command to the device
+	movzx edi, [.port]
+	shl edi, 7
+	add edi, AHCI_ABAR_PORT_CONTROL
+	add edi, [ahci_abar]
+
+	mov eax, [edi+AHCI_PORT_IRQ_STATUS]
+	mov [edi+AHCI_PORT_IRQ_STATUS], eax
+
+	and dword[edi+AHCI_PORT_COMMAND], not 1
+	and dword[edi+AHCI_PORT_COMMAND_ISSUE], not 1
 	mov dword[edi+AHCI_PORT_COMMAND_LIST], ahci_command_list
 	mov dword[edi+AHCI_PORT_COMMAND_LIST+4], 0
-	mov dword[edi+AHCI_PORT_FIS], ahci_fis
-	mov dword[edi+AHCI_PORT_FIS+4], 0
-	;or dword[edi+AHCI_PORT_COMMAND], 0x10000017	; enable command execution
-	mov dword[edi+AHCI_PORT_COMMAND_ISSUE], 1	; execute command list 0
+
+.wait_bsy:
+	sti
+	hlt
+	test dword[edi+AHCI_PORT_TASK_FILE], 0x80
+	jnz .wait_bsy
+
+.send_command:
 	or dword[edi+AHCI_PORT_COMMAND], 1
-	wbinvd
+	or dword[edi+AHCI_PORT_COMMAND_ISSUE], 1
 
-	mov ecx, 1000000		; use this as a timeout
-
-.wait_for_command:
-	; wait for the device to receive the command
-	pause
-	dec ecx
-	cmp ecx, 0
-	je .error
+.loop:
+	sti
+	hlt
 	test dword[edi+AHCI_PORT_COMMAND_ISSUE], 1
-	jnz .wait_for_command
-	test dword[edi+AHCI_PORT_TASK_FILE], 0x80		; bsy
-	jnz .wait_for_command
-	test dword[edi+AHCI_PORT_TASK_FILE], 0x01		; error
+	jz .after_loop
+	test dword[edi+AHCI_PORT_TASK_FILE], 0x01	; error
 	jnz .error
-	test dword[edi+AHCI_PORT_TASK_FILE], 0x20		; drive fault
+	test dword[edi+AHCI_PORT_TASK_FILE], 0x20	; drive fault
+
+	loop .loop
+	jmp .error
+
+.after_loop:
+	; turn off the command execution
+	and dword[edi+AHCI_PORT_COMMAND], not 1
+	and dword[edi+AHCI_PORT_COMMAND_ISSUE], not 1
+
+	;mov eax, [edi+AHCI_PORT_IRQ_STATUS]
+	;mov [edi+AHCI_PORT_IRQ_STATUS], eax
+
+	mov eax, [edi+AHCI_PORT_TASK_FILE]
+	test al, 0x01		; error
 	jnz .error
-	;test dword[edi+AHCI_PORT_IRQ_STATUS], 0x40000000	; task file error
-	;jnz .error
 
-	and dword[edi+AHCI_PORT_COMMAND], 0xFFFFFFFE
-	mov dword[edi+AHCI_PORT_COMMAND_ISSUE], 0
-	wbinvd
+	test al, 0x20		; drive fault
+	jnz .error
 
-	; ensure the controller transferred the correct # of bytes
-	cmp [ahci_command_list.prdt_successful_count], 512
-	jne .error
+	cmp [ahci_command_list.prdt_byte_count], 512	; did the DMA transfer all the data?
+	jne .error					; nope -- bail out
 
-	mov esi, .msg
+	mov esi, .sata_model_msg
 	call kprint
+
+	mov esi, sata_identify_data.model
+	call swap_string_order
+	call trim_string
+	call kprint
+	mov esi, .sata_model_msg2
+	call kprint
+
 	movzx eax, [.port]
 	call int_to_string
 	call kprint
-	mov esi, .msg2
-	call kprint
-	mov esi, sata_identify_data.model
-	call swap_string_order	; apparantly ahci also uses the same stupid convention that exists in ata
-	call trim_string
-	call kprint
-	mov esi, .msg3
+	mov esi, newline
 	call kprint
 
-	; since the call succeeded, register the device with the block device manager
+	; register the device
 	mov al, BLKDEV_AHCI
 	mov ah, BLKDEV_PARTITIONED
 	movzx edx, [.port]
 	call blkdev_register
 
-	clc
+.quit:
+	call ahci_enable_cache
 	ret
 
 .error:
 	mov esi, .error_msg
 	call kprint
-	movzx eax, [.port]
-	call int_to_string
-	call kprint
-	mov esi, .error_msg2
-	call kprint
 
-	movzx edi, [.port]
-	and edi, 0x1F
-	shl edi, 7
-	add edi, AHCI_ABAR_PORT_CONTROL
-	add edi, [ahci_abar]
-	mov eax, [edi+AHCI_PORT_TASK_FILE]
-	call hex_byte_to_string
-	call kprint
-
-	mov esi, newline
-	call kprint
-	stc
+	call ahci_enable_cache
 	ret
 
-.port			db 0
-.buffer			dd 0
-.msg			db "SATA device on AHCI port ",0
-.msg2			db " is '",0
-.msg3			db "'",10,0
-.error_msg		db "Failed to receive data from AHCI device on port ",0
-.error_msg2		db "; task file data 0x",0
+.port				db 0
+.sata_model_msg			db "ahci: found SATA device '",0
+.sata_model_msg2		db "' on AHCI port ",0
+.error_msg			db "ahci: failed to receive identify information from SATA drive.",10,0
 
 ; ahci_read:
-; Reads from an AHCI device
-; In\	EDX:EAX = LBA sector
+; Reads from an AHCI SATA device
+; In\	EDX:EAX	= LBA sector
 ; In\	ECX = Sector count
 ; In\	BL = Port number
 ; In\	EDI = Buffer to read sectors
 ; Out\	AL = 0 on success, 1 on error
-; Out\	AH = Device task file
+; Out\	AH = Device task file register
 
 ahci_read:
-	; first ensure the device is SATA
-	and bl, 0x1F
+	;;
+	;; TO-DO: Check if the device is SATAPI, and then read it instead of SATA.
+	;;
+
 	mov [.port], bl
-
-	mov esi, ebx
-	and esi, 0x1F
-	shl esi, 7
-	add esi, AHCI_ABAR_PORT_CONTROL
-	add esi, [ahci_abar]
-
-	cmp dword[esi+AHCI_PORT_SIGNATURE], 0x00000101	; sata
-	je sata_read
-
-	; maybe add satapi support someday?
-	;cmp dword[esi+AHCI_PORT_SIGNATURE], 0xEB140101
-	;je satapi_read
-
-	mov al, 1
-	mov ah, 0xFF
-	ret
-
-.port			db 0
-
-; sata_read:
-; Reads from a SATA device using AHCI
-; In\	EDX:EAX = LBA sector
-; In\	ECX = Sector count
-; In\	BL = Port number
-; In\	EDI = Buffer to read sectors
-; Out\	AL = 0 on success, 1 on error
-; Out\	AH = Device task file
-
-sata_read:
-	mov dword[.lba+4], edx
 	mov dword[.lba], eax
+	mov dword[.lba+4], edx
 	mov [.count], ecx
-	and bl, 0x1F
-	mov [.port], bl
 	mov [.buffer], edi
 
-	; set up the command list
+	call ahci_disable_cache
+
+	; ahci uses DMA so we need physical address
+	mov eax, [.buffer]
+	and eax, 0xFFFFF000
+	call vmm_get_page
+	test dl, PAGE_PRESENT	; the DMA is not aware of paging, so we need to do this for safety...
+	jz .memory_error
+
+	mov ebx, [.buffer]
+	and ebx, 0xFFF
+	add eax, ebx
+	mov [.buffer_phys], eax
+
+	; clear all nescessary structures
 	mov edi, ahci_command_list
-	mov ecx, end_of_ahci_command_list-ahci_command_list
-	mov eax, 0
+	mov ecx, end_ahci_command_list - ahci_command_list
+	xor al, al
 	rep stosb
 
-	mov [ahci_command_list.command_information], 0x10	; command fis is 64 bytes
-	mov [ahci_command_list.prdt_length], 1			; do everything in 1 DMA transfer
+	mov edi, ahci_command_table
+	mov ecx, end_ahci_command_table - ahci_command_table
+	xor al, al
+	rep stosb
+
+	; make the command list
+	mov [ahci_command_list.cfis_length], 5
+	mov [ahci_command_list.prdt_length], 1
 	mov dword[ahci_command_list.command_table], ahci_command_table
 
-	; set up the FIS
-	mov edi, ahci_fis
-	mov ecx, end_of_ahci_fis-ahci_fis
-	mov eax, 0
-	rep stosb
-
-	; tell the device about the types of FIS
-	mov [ahci_dma_fis.fis_type], 0x41
-	mov [ahci_pio_fis.fis_type], 0x5F
-	mov [ahci_register_fis.fis_type], 0x34
-	mov [ahci_device_bits_fis.fis_type], 0xA1
-
-	; set up the command table
-	mov edi, ahci_command_table
-	mov ecx, end_of_ahci_command_table-ahci_command_table
-	mov eax, 0
-	rep stosb
-
-	; set up the command FIS
-	mov [ahci_command_fis.fis_type], 0x27
-	mov [ahci_command_fis.command], 0x80
+	; the command FIS
+	mov [ahci_command_fis.fis_type], AHCI_FIS_H2D
+	mov [ahci_command_fis.flags], 0x80
+	mov [ahci_command_fis.command], SATA_READ_LBA28
 	mov [ahci_command_fis.device], 0xE0
+	mov eax, [.count]
+	mov [ahci_command_fis.count], ax
 
-	; depending on the LBA, we will use LBA28 or LBA48
-	cmp dword[.lba+4], 0
-	jne .lba48
-
-	cmp dword[.lba], 0xFFFFFFF-256
-	jg .lba48
-
-.lba28:
-	mov [ahci_command_fis.command_byte], SATA_READ_LBA28	; read command
-	jmp .do_command_fis
-
-.lba48:
-	mov [ahci_command_fis.command_byte], SATA_READ_LBA48
-
-.do_command_fis:
-	; put the lba and sector count in the command FIS
+	; LBA...
 	mov eax, dword[.lba]
 	mov [ahci_command_fis.lba0], al
 	shr eax, 8
@@ -640,133 +387,97 @@ sata_read:
 	shr eax, 8
 	mov [ahci_command_fis.lba3], al
 
-	mov edx, dword[.lba+4]
-	mov [ahci_command_fis.lba4], dl
-	shr edx, 8
-	mov [ahci_command_fis.lba5], dl
+	;mov eax, dword[.lba+4]
+	;mov [ahci_command_fis.lba4], al
+	;shr eax, 8
+	;mov [ahci_command_fis.lba5], al
 
-	mov ecx, [.count]
-	;and ecx, 0xFFFF		; max 65535 sectors
-	mov [ahci_command_fis.count], cx
+	; the PRDT
+	mov eax, [.buffer_phys]
+	mov dword[ahci_prdt.base], eax
+	mov eax, [.count]
+	shl eax, 9	; mul 512
+	dec eax
+	mov [ahci_prdt.count], eax
 
-	; now set up the PRDT
-	mov eax, [.buffer]
-	call vmm_get_page
-	cmp eax, 0
-	je .error
-	test dl, PAGE_PRESENT		; ensure we don't accidentally write to non-existant page --
-	jz .error			; -- because the DMA is not aware of paging!
-
-	mov edx, [.buffer]
-	and edx, 0xFFF
-	add eax, edx
-	mov dword[ahci_prdt.memory], eax
-
-	mov ecx, [.count]
-	and ecx, 0xFFFF
-	shl ecx, 9				; mul 512
-	mov [ahci_prdt.byte_count], ecx		; DMA bytes to transfer
-
-	; device control registers
+	; send the command to the device
 	movzx edi, [.port]
-	and edi, 0x1F
 	shl edi, 7
 	add edi, AHCI_ABAR_PORT_CONTROL
 	add edi, [ahci_abar]
 
-.wait_for_bsy:
-	; first ensure the device is not busy
-	test dword[edi+AHCI_PORT_TASK_FILE], 0x80
-	jnz .wait_for_bsy
+	mov eax, [edi+AHCI_PORT_IRQ_STATUS]
+	mov [edi+AHCI_PORT_IRQ_STATUS], eax
 
-	;test dword[edi+AHCI_PORT_TASK_FILE], 0x08
-	;jnz .wait_for_bsy
-
-	; now we know the device is not busy; turn off command execution
-	and dword[edi+AHCI_PORT_COMMAND], 0xFFFFFFFE
-	mov dword[edi+AHCI_PORT_COMMAND_ISSUE], 0
-	wbinvd
-
-	mov ecx, 100000		; timeout
-
-.wait_for_idle:
-	pause
-	dec ecx
-	cmp ecx, 0
-	je .error
-	test dword[edi+AHCI_PORT_COMMAND], 1	; is the device ready to execute command?
-	jnz .wait_for_idle			; it shouldn't be; we just disabled it
-	cmp dword[edi+AHCI_PORT_COMMAND_ISSUE], 0
-	jne .wait_for_idle
-
-	; send the FIS and command list to the device
+	and dword[edi+AHCI_PORT_COMMAND], not 1
+	and dword[edi+AHCI_PORT_COMMAND_ISSUE], not 1
 	mov dword[edi+AHCI_PORT_COMMAND_LIST], ahci_command_list
 	mov dword[edi+AHCI_PORT_COMMAND_LIST+4], 0
-	mov dword[edi+AHCI_PORT_FIS], ahci_fis
-	mov dword[edi+AHCI_PORT_FIS+4], 0
-	mov dword[edi+AHCI_PORT_COMMAND_ISSUE], 1	; execute command list 0
-	or dword[edi+AHCI_PORT_COMMAND], 1		; enable command execution
-	wbinvd
 
-	mov ecx, 1000000	; use this as a timeout
+.wait_bsy:
+	sti
+	hlt
+	test dword[edi+AHCI_PORT_TASK_FILE], 0x80
+	jnz .wait_bsy
 
-.wait_for_command:
-	; wait for the device to receive the command
-	pause
-	dec ecx
-	cmp ecx, 0
-	je .error
+.send_command:
+	or dword[edi+AHCI_PORT_COMMAND], 1
+	or dword[edi+AHCI_PORT_COMMAND_ISSUE], 1
+
+.loop:
+	sti
+	hlt
 	test dword[edi+AHCI_PORT_COMMAND_ISSUE], 1
-	jnz .wait_for_command
-	test dword[edi+AHCI_PORT_TASK_FILE], 0x80		; bsy
-	jnz .wait_for_command
-	test dword[edi+AHCI_PORT_IRQ_STATUS], 0x40000000	; task file error
+	jz .after_loop
+	test dword[edi+AHCI_PORT_TASK_FILE], 0x01	; error
 	jnz .error
-	test dword[edi+AHCI_PORT_TASK_FILE], 0x01		; error
-	jnz .error
-	test dword[edi+AHCI_PORT_TASK_FILE], 0x20		; drive fault
+	test dword[edi+AHCI_PORT_TASK_FILE], 0x20	; drive fault
+
+	loop .loop
+	jmp .error
+
+.after_loop:
+	; turn off the command execution
+	and dword[edi+AHCI_PORT_COMMAND], not 1
+	and dword[edi+AHCI_PORT_COMMAND_ISSUE], not 1
+
+	;mov eax, [edi+AHCI_PORT_IRQ_STATUS]
+	;mov [edi+AHCI_PORT_IRQ_STATUS], eax
+
+	mov eax, [edi+AHCI_PORT_TASK_FILE]
+	test al, 0x01		; drive error?
 	jnz .error
 
-	and dword[edi+AHCI_PORT_COMMAND], 0xFFFFFFFE
-	mov dword[edi+AHCI_PORT_COMMAND_ISSUE], 0
-	wbinvd
+	test al, 0x20		; drive fault?
+	jnz .error
 
-	; ensure the controller transferred the correct # of bytes
-	mov ecx, [.count]
-	and ecx, 0xFFFF
-	shl ecx, 9
-	cmp [ahci_command_list.prdt_successful_count], ecx
+	mov eax, [.count]
+	mov ebx, [ahci_prdt.count]
+	shl eax, 9
+	cmp [ahci_command_list.prdt_byte_count], eax
 	jne .error
 
-	mov al, 0
+	call ahci_enable_cache
+	mov eax, 0
 	ret
 
 .error:
-	movzx esi, [.port]
-	shl esi, 7
-	add esi, AHCI_ABAR_PORT_CONTROL
-	add esi, [ahci_abar]
+	movzx edi, [.port]
+	shl edi, 7
+	add edi, AHCI_ABAR_PORT_CONTROL
+	add edi, [ahci_abar]
 
-	mov eax, [esi+AHCI_PORT_TASK_FILE]
-	mov [.task_file], al		; task file register
+	mov ebx, [edi+AHCI_PORT_TASK_FILE]
+	mov [.task_file], bl
 
-	mov esi, .fail_msg
-	call kprint
-	mov eax, [.count]
-	call hex_word_to_string
-	call kprint
-	mov esi, .fail_msg2
-	call kprint
-	mov edx, dword[.lba+4]
-	mov eax, dword[.lba]
-	call hex_qword_to_string
-	call kprint
-	mov esi, .fail_msg3
+	call ahci_enable_cache
+
+	mov esi, .error_msg
 	call kprint
 	movzx eax, [.port]
 	call int_to_string
 	call kprint
-	mov esi, .fail_msg4
+	mov esi, .error_msg2
 	call kprint
 	mov al, [.task_file]
 	call hex_byte_to_string
@@ -774,146 +485,93 @@ sata_read:
 	mov esi, newline
 	call kprint
 
-	mov ah, [.task_file]
-	mov al, 1		; indicate error
 	ret
 
+.memory_error:
+	call ahci_enable_cache
 
-.lba				dq 0
-.count				dd 0
-.port				db 0
-.buffer				dd 0
-.task_file			db 0
-.fail_msg			db "Failed to read 0x",0
-.fail_msg2			db " sectors from LBA 0x",0
-.fail_msg3			db " from SATA device on AHCI port ",0
-.fail_msg4			db "; task file data: 0x",0
+	mov esi, .memory_error_msg
+	call kprint
+	mov eax, [.buffer]
+	call hex_dword_to_string
+	call kprint
+	mov esi, .memory_error_msg2
+	call kprint
+
+	mov ax, 0xFF01
+	ret
+
+.lba			dq 0
+.port			db 0
+.count			dd 0
+.buffer			dd 0
+.buffer_phys		dd 0
+.task_file		db 0
+.error_msg		db "ahci: hardware error on port ",0
+.error_msg2		db "; task file 0x",0
+.memory_error_msg	db "ahci: attempted to write to non-present page (0x",0
+.memory_error_msg2	db ")",10,0
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 
 ; ahci_command_list:
-; Command list for sending AHCI commands
-align 1024		; 1k-alignment
+; Names says^^
+align 4096
 ahci_command_list:
-	.command_information		dw 0x0010	; command FIS is 16 dwords size, all other bits un-needed for us
-	.prdt_length			dw 1
-	.prdt_successful_count		dd 0
-	.command_table			dq ahci_command_table
-
-	.reserved:			times 2 dq 0
-
-	times 31*8 dd 0			; clear out the rest of the command list
-end_of_ahci_command_list:
-
-; ahci_fis:
-; AHCI device to host FIS
-align 1024
-ahci_fis:
-
-ahci_dma_fis:
-	.fis_type		db 0x41
+	.cfis_length		db (end_ahci_command_fis-ahci_command_fis) / 4
 	.port_multiplier	db 0
-	.reserved		dw 0
+	.prdt_length		dw 1
 
-	.dma_buffer		dq 0
-	.reserved2		dd 0
-	.dma_buffer_offset	dd 0
-	.transfer_count		dd 0
-	.reserved3		dd 0
+	.prdt_byte_count	dd 0
 
-	.padding0:		times 0x20 - ($-ahci_fis) db 0
+	.command_table		dq ahci_command_table
 
-ahci_pio_fis:
-	.fis_type		db 0x5F
-	.port_multiplier	db 0
-	.status			db 0
-	.error			db 0
+	times 4 dd 0
+	times 31*8 dd 0
 
-	.lba0			db 0
-	.lba1			db 0
-	.lba2			db 0
-	.device			db 0
-
-	.lba3			db 0
-	.lba4			db 0
-	.lba5			db 0
-	.rsv2			db 0
-
-	.count			dw 0
-	.rsv3			db 0
-	.new_status		db 0
-
-	.transfer_count		dw 0
-	.rsv4			dw 0
-
-	.padding1:		times 0x40 - ($-ahci_fis) db 0
-
-ahci_register_fis:
-	.fis_type		db 0x34
-	.port_multiplier	db 0
-
-	.status			db 0
-	.error			db 0
-
-	.lba0			db 0
-	.lba1			db 0
-	.lba2			db 0
-	.device			db 0
-
-	.lba3			db 0
-	.lba4			db 0
-	.lba5			db 0
-	.rsv2			db 0
-
-	.count			dw 0
-	.rsv3			dw 0
-	.rsv4			dd 0
-
-	.padding2:		times 0x58 - ($-ahci_fis) db 0
-
-ahci_device_bits_fis:
-	.fis_type		db 0xA1
-	times 256 - ($-ahci_fis) db 0
-end_of_ahci_fis:
+end_ahci_command_list:
 
 ; ahci_command_table:
-; Command table for sending AHCI commands
-align 1024
+; Name says again^^
+align 4096
 ahci_command_table:
 
 ahci_command_fis:
-	.fis_type			db 0x27		; Host to Device
-	.command			db 0x80		; command not control
+	.fis_type		db AHCI_FIS_H2D
+	.flags			db 0x80
+	.command		db 0
+	.feature_low		db 0
 
-	.command_byte			db 0x00
-	.feature_low			db 0x00
+	.lba0			db 0
+	.lba1			db 0
+	.lba2			db 0
+	.device			db 0
 
-	.lba0				db 0
-	.lba1				db 0
-	.lba2				db 0
-	.device				db 0
+	.lba3			db 0
+	.lba4			db 0
+	.lba5			db 0
+	.feature_high		db 0
 
-	.lba3				db 0
-	.lba4				db 0
-	.lba5				db 0
-	.feature_high			db 0x00
+	.count			dw 0
+	.icc			db 0
+	.control		db 0
 
-	.count				dw 0
-	.icc				db 0
-	.control			db 0
+	.reserved		dd 0
 
-	.reserved			dd 0
+end_ahci_command_fis:
 
-	times 64 - ($-ahci_command_table) db 0
-
-ahci_satapi_fis:			times 16 db 0	; for sending atapi packets using ahci
-
-	times 128 - ($-ahci_command_table) db 0
+	times 0x80 - ($-ahci_command_table) db 0
 
 ahci_prdt:
-	.memory				dq 0
-	.rsv0				dd 0
-	.byte_count			dd 0x00000000
+	.base			dq 0
+	.reserved		dd 0
+	.count			dd 0
 
-end_of_ahci_command_table:
+end_ahci_command_table:
 
 ; sata_identify_data:
 ; Data returned from the SATA/SATAPI IDENTIFY command
@@ -959,8 +617,6 @@ sata_identify_data:
 	.user_addressable_secs	dd 0
 				dw 0
 	times 512 - ($-sata_identify_data) db 0
-
-
 
 
 
