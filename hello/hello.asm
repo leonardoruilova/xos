@@ -35,9 +35,20 @@ main:
 	int 0x60		; call kernel
 
 .hang:
+	mov ebp, 4		; read event
+	mov eax, [window_handle]
+	int 0x60
+
+	test ax, 0x0008		; close event
+	jnz .quit
+
 	mov ebp, 1		; give control to next task
 	int 0x60
 	jmp .hang
+
+.quit:
+	mov ebp, 0x15		; terminate application
+	int 0x60
 
 	title			db "Hello world",0
 	text			db "Welcome to the Hello World ",10

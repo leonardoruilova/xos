@@ -42,6 +42,9 @@ main:
 .wait:
 	; wait here for event
 	call xwidget_wait_event
+	cmp eax, XWIDGET_CLOSE		; close event?
+	je .close
+
 	cmp eax, XWIDGET_BUTTON		; button click event?
 	jne .wait
 
@@ -58,9 +61,14 @@ main:
 
 .hang:
 	; there's not much left to do...
-	mov ebp, XOS_YIELD
-	int 0x60
+	call xwidget_wait_event
+	cmp eax, XWIDGET_CLOSE		; close event?
+	je .close
 	jmp .hang
+
+.close:
+	mov ebp, 0x15		; terminate..
+	int 0x60
 
 	; Data...
 	window_title			db "Button Demo",0

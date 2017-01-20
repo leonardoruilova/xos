@@ -16,6 +16,7 @@ application_header:
 WM_LEFT_CLICK			= 0x0001
 WM_RIGHT_CLICK			= 0x0002
 WM_KEYPRESS			= 0x0004
+WM_CLOSE			= 0x0008
 
 main:
 	mov ebp, 0		; create the window
@@ -36,8 +37,11 @@ main:
 	mov eax, [window_handle]
 	int 0x60
 
+	test ax, WM_CLOSE	; if the user clicked close, terminate
+	jnz .quit
+
 	test ax, WM_LEFT_CLICK
-	jnz .got_event		; if the user clicked, read the mouse status
+	jnz .got_event		; if the user clicked the window, read the mouse status
 
 	mov ebp, 1
 	int 0x60
@@ -70,6 +74,10 @@ main:
 	stosd
 	stosd
 	jmp .wait
+
+.quit:
+	mov ebp, 0x15		; terminate application
+	int 0x60
 
 	title			db "Draw",0
 	window_handle		dd 0

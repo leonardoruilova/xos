@@ -432,5 +432,73 @@ create_task:
 .file_error_msg			db "load error: Unable to read program file.",10,0
 .corrupt_msg			db "load error: Program file is corrupt.",10,0
 
+; terminate:
+; Terminates the current task
+
+terminate:
+	movzx eax, [current_task]	; simply kill the current task ;)
+	call kill_task
+
+	add esp, 4
+	jmp idle_process
+
+; kill_task:
+; Kills a task
+; In\	EAX = PID
+; Out\	Nothing
+
+kill_task:
+	mov [.task], eax
+
+	; verify the task even exists
+	shl eax, 5
+	add eax, [task_structure]
+	test word[eax+TASK_STATE], TASK_PRESENT
+	jz .finish
+
+	; clean up after the task by killing any windows created by it
+	mov [.window_handle], 0
+
+.loop:
+	cmp [.window_handle], MAXIMUM_WINDOWS
+	jge .kill_task
+
+	mov edi, [.window_handle]
+	shl edi, 7
+	add edi, [window_handles]
+	test dword[edi+WINDOW_FLAGS], WM_PRESENT
+	jz .next_window
+
+	mov eax, [.task]
+	cmp [edi+WINDOW_PID], eax
+	je .kill_window
+
+.next_window:
+	inc [.window_handle]
+	jmp .loop
+
+.kill_window:
+	mov eax, [.window_handle]
+	call wm_kill
+	jmp .next_window
+
+.kill_task:
+	mov edi, [.task]
+	shl edi, 5
+	add edi, [task_structure]
+	xor al, al
+	mov ecx, TASK_SIZE
+	rep stosb
+
+	dec [running_tasks]
+	mov [current_task], 0
+
+.finish:
+	ret
+
+align 4
+.task				dd 0
+.window_handle			dd 0
+
 
 

@@ -29,4 +29,7 @@
 
 	XOS_READ_KEY		= 0x0014
 
+	XOS_TERMINATE		= 0x0015
+
+
 

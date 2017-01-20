@@ -42,15 +42,13 @@ WINDOW_HANDLE_SIZE		= 0x80
 
 ; Window Flags
 WM_PRESENT			= 0x0001
-WM_HIDDEN			= 0x0002
-WM_ALPHA			= 0x0004
-WM_THIN_BORDER			= 0x0008
-WM_NO_BORDER			= 0x0010
+WM_NO_FRAME			= 0x0002
 
 ; Window Events
 WM_LEFT_CLICK			= 0x0001
 WM_RIGHT_CLICK			= 0x0002
 WM_KEYPRESS			= 0x0004
+WM_CLOSE			= 0x0008
 
 MAXIMUM_WINDOWS			= 32
 
@@ -68,17 +66,25 @@ align 4
 wm_color			dd 0x00B0B0
 ;wm_color			dd 0x004288
 window_title			dd 0xFFFFFF
-window_inactive_title		dd 0xFFFFFF
-window_border			dd 0x505050
-window_active_border		dd 0x505050
+window_inactive_title		dd 0xC0C0C0
+window_border			dd 0x383838
+window_active_border		dd 0x383838
 window_active_outline		dd 0x00A2E8
-window_close_color		dd 0xFF3030
-window_background		dd 0xE8E8E8
-window_opacity			db 1		; valid values are 0 to 4, 0 = opaque, 1 = less transparent, 4 = most transparent.
+window_close_color		dd 0xD80000
+window_background		dd 0xD0D0D0
+window_opacity			db 0		; valid values are 0 to 4, 0 = opaque, 1 = less transparent, 4 = most transparent.
 
 align 4
 window_border_x_min		dw 0		; min x pos for a 0 width window
 window_border_y_min		dw 24		; min y pos for a 0 height window
+window_close_position		db 0		; 0 = left, 1 = right, for now this has no effect
+
+align 4
+window_close_x			dw 4
+window_close_y			dw 4
+window_close_width		dw 16
+window_close_height		dw 16
+
 window_title_x			dw 24
 window_title_y			dw 4
 window_canvas_x			dw 0
@@ -619,10 +625,10 @@ align 32
 	; the close button
 	mov ax, [.x]
 	mov bx, [.y]
-	add ax, 4
-	add bx, 4
-	mov si, 16
-	mov di, 16
+	add ax, [window_close_x]
+	add bx, [window_close_y]
+	mov si, [window_close_width]
+	mov di, [window_close_height]
 	mov edx, [window_close_color]
 	call fill_rect
 
@@ -688,10 +694,10 @@ align 32
 	; the close button
 	mov ax, [.x]
 	mov bx, [.y]
-	add ax, 4
-	add bx, 4
-	mov si, 16
-	mov di, 16
+	add ax, [window_close_x]
+	add bx, [window_close_y]
+	mov si, [window_close_width]
+	mov di, [window_close_height]
 	mov edx, [window_close_color]
 	call fill_rect
 
@@ -754,8 +760,8 @@ wm_mouse_event:
 	jge .set_focus
 
 	call wm_is_mouse_on_window
-	or eax, eax
-	jz .set_focus
+	cmp eax, 0
+	je .set_focus
 
 	; send the window a click event ONLY if the mouse is not on the title bar
 	; otherwise we page fault in usermode! ;)
@@ -768,7 +774,7 @@ wm_mouse_event:
 	add dx, [window_border_y_min]
 
 	cmp cx, dx
-	jl .done
+	jl .check_exit
 
 	add dx, [eax+WINDOW_HEIGHT]
 	;add dx, [window_border_y_min]
@@ -778,6 +784,38 @@ wm_mouse_event:
 	or word[eax+WINDOW_EVENT], WM_LEFT_CLICK
 	;mov [wm_dirty], 1
 
+	jmp .done
+
+.check_exit:
+	mov ecx, [mouse_x]
+	mov edx, [mouse_y]
+	sub ecx, [eax+WINDOW_X]
+	sub edx, [eax+WINDOW_Y]
+
+	cmp cx, [window_close_x]
+	jl .done
+
+	cmp dx, [window_close_y]
+	jl .done
+
+	mov bx, [window_close_x]
+	add bx, [window_close_width]
+
+	cmp cx, bx
+	jg .done
+
+	mov bx, [window_close_y]
+	add bx, [window_close_height]
+
+	cmp dx, bx
+	jg .done
+
+	; here the user has clicked on the close button
+	; send the window a close event
+	mov eax, [active_window]
+	shl eax, 7
+	add eax, [window_handles]
+	or word[eax+WINDOW_EVENT], WM_CLOSE
 	jmp .done
 
 .set_focus:

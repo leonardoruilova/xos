@@ -6,8 +6,8 @@ use32
 
 	; Change These Variables To Suit Yourself
 	align 4
-	xwidget_window_color	dd 0xE8E8E8
-	xwidget_button_color	dd 0xC8C8C8
+	xwidget_window_color	dd 0xD8D8D8
+	xwidget_button_color	dd 0xC0C0C0
 	xwidget_textbox_bg	dd 0xFFFFFF
 	xwidget_textbox_fg	dd 0x000000
 	xwidget_outline_focus	dd 0x00A2E8
@@ -19,8 +19,10 @@ use32
 	WM_LEFT_CLICK		= 0x0001
 	WM_RIGHT_CLICK		= 0x0002
 	WM_KEYPRESS		= 0x0004
+	WM_CLOSE		= 0x0008
 
-	XWIDGET_BUTTON		= 0x0000	; button click event
+	XWIDGET_BUTTON		= 0x0001	; button click event
+	XWIDGET_CLOSE		= 0x0002	; close event
 
 	xwidget_version		db "libxwidget 1",0
 
@@ -169,7 +171,10 @@ xwidget_wait_event:
 	mov ebp, XOS_WM_READ_EVENT
 	int 0x60
 
-	test ax, WM_LEFT_CLICK	; only left click is supported for now..
+	test ax, WM_CLOSE
+	jnz .close
+
+	test ax, WM_LEFT_CLICK
 	jnz .clicked
 
 .skip:
@@ -183,6 +188,11 @@ xwidget_wait_event:
 	mov ebp, XOS_YIELD	; cooperative multitasking -- give control to next task
 	int 0x60
 	jmp .start		; when control comes back to us, continue waiting for event
+
+.close:
+	mov eax, XWIDGET_CLOSE
+	mov ebx, [.current_window]
+	ret
 
 .clicked:
 	; read the mouse x/y pos

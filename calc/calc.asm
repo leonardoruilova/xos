@@ -178,9 +178,22 @@ main:
 .wait:
 	; wait here for event
 	call xwidget_wait_event
-	cmp eax, XWIDGET_BUTTON		; buttonclick event
-	jne .wait
 
+	cmp eax, XWIDGET_CLOSE
+	je .close
+
+	cmp eax, XWIDGET_BUTTON		; buttonclick event
+	je .button_click
+
+	jmp .wait
+
+.close:
+	call xwidget_destroy
+
+	mov ebp, 0x15
+	int 0x60
+
+.button_click:
 	; ebx has the button which was pressed
 	cmp ebx, [button1_handle]
 	je .1
