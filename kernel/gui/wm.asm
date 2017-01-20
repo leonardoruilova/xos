@@ -821,9 +821,12 @@ wm_mouse_event:
 .set_focus:
 	call wm_detect_window
 	mov [active_window], eax
-	;mov [wm_dirty], 1
-	jmp .done
+
+	cmp eax, -1
+	je .done
+
 	;jmp .done
+	jmp .click
 
 .drag:
 	;mov [wm_dirty], 1

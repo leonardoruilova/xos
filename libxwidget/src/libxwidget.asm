@@ -6,8 +6,8 @@ use32
 
 	; Change These Variables To Suit Yourself
 	align 4
-	xwidget_window_color	dd 0xD8D8D8
-	xwidget_button_color	dd 0xC0C0C0
+	xwidget_window_color	dd 0xD0D0D0
+	xwidget_button_color	dd 0xB8B8B8
 	xwidget_textbox_bg	dd 0xFFFFFF
 	xwidget_textbox_fg	dd 0x000000
 	xwidget_outline_focus	dd 0x00A2E8
