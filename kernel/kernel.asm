@@ -62,20 +62,12 @@ kmain16:
 	mov eax, cr4
 	mov [bios_cr4], eax
 
-	; enable SSE2
+	; detect SSE2
 	mov eax, 1
 	cpuid
 	;test edx, 1 shl 25
 	test edx, 1 shl 26	; movdqa is an SSE2 instruction; SSE support without SSE2 makes undefined opcode
 	jz no_sse
-
-	mov eax, 0x600
-	mov cr4, eax
-
-	mov eax, cr0
-	and eax, 0xFFFFFFFB
-	or eax, 2
-	mov cr0, eax
 
 	; do things that are easier to do with BIOS
 	call get_disk_size
@@ -178,6 +170,15 @@ kmain32:
 	; initialize the math coprocessor
 	finit
 	fwait
+
+	; enable SSE
+	mov eax, 0x600
+	mov cr4, eax
+
+	mov eax, cr0
+	and eax, 0xFFFFFFFB
+	or eax, 2
+	mov cr0, eax
 
 	; enable PMC in userspace
 	mov eax, cr4

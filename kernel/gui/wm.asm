@@ -847,7 +847,7 @@ wm_mouse_event:
 	cmp cx, dx
 	jl .done
 
-	add dx, 24
+	add dx, [window_border_y_min]
 	cmp cx, dx
 	jg .click
 

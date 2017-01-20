@@ -185,6 +185,59 @@ install_exceptions:
 exception_handler:
 	cli
 	call save_regs
+
+	; if the error was caused in userspace, make a register dump and kill the process
+	; else, make a kernel panic and freeze the system
+	cmp [current_task], 0
+	je .kernel
+
+.user:
+	mov eax, [esp+16]	; CS
+	mov [dump_cs], ax
+
+	mov eax, [esp+16+4]	; EFLAGS
+	mov [dump_eflags], eax
+
+	mov eax, [esp+16+8]	; ESP
+	mov [dump_esp], eax
+
+	mov eax, [esp+12+4+4+4+4]
+	mov [dump_ss], ax
+
+	mov esi, .umsg
+	call kprint
+	movzx eax, [current_task]
+	call int_to_string
+	call kprint
+	mov esi, .colon
+	call kprint
+	mov esi, [esp+4]	; exception name
+	call kprint
+	mov esi, newline
+	call kprint
+
+	mov esi, .error_code
+	call kprint
+	mov eax, [esp+8]
+	call hex_dword_to_string
+	call kprint
+
+	mov esi, .eip
+	call kprint
+	mov eax, [esp+12]		; eip
+	call hex_dword_to_string
+	call kprint
+	mov esi, newline
+	call kprint
+
+	call dump_regs
+
+	mov esi, .terminating_msg
+	call kprint
+
+	call terminate
+
+.kernel:
 	call use_front_buffer
 
 	mov [debug_mode],1
@@ -208,20 +261,20 @@ exception_handler:
 	mov eax, [esp+12+4+4+4+4]
 	mov [dump_ss], ax
 
-	mov esi, .msg
+	mov esi, .kmsg
 	call kprint
 	mov esi, [esp+4]
 	call kprint
 	mov esi, newline
 	call kprint
 
-	mov esi, .msg2
+	mov esi, .error_code
 	call kprint
 	mov eax, [esp+8]
 	call hex_dword_to_string
 	call kprint
 
-	mov esi, .msg3
+	mov esi, .eip
 	call kprint
 	mov eax, [esp+12]		; eip
 	call hex_dword_to_string
@@ -234,9 +287,12 @@ exception_handler:
 	cli
 	hlt
 
-.msg			db "KERNEL PANIC: ",0
-.msg2			db "Error code: 0x",0
-.msg3			db ", fault address: 0x",0
+.kmsg			db "KERNEL PANIC: ",0
+.umsg			db "EXCEPTION IN USER APPLICATION PID ",0
+.colon			db ": ",0
+.error_code		db "Error code: 0x",0
+.eip			db ", fault address: 0x",0
+.terminating_msg	db "Terminating faulty process...",10,0
 
 ; panic:
 ; Makes a kernel panic

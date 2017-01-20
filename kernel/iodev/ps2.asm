@@ -562,8 +562,7 @@ ps2_mouse_irq:
 	cmp dl, 2
 	je .y
 
-	xor dl, dl
-	mov [mouse_irq_state], dl
+	mov [mouse_irq_state], 0
 	jmp .done
 
 .data:
