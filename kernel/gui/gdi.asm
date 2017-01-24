@@ -159,6 +159,18 @@ clear_screen:
 	;mov [screen.x], 0
 	;mov [screen.y], 0
 
+	cmp [current_buffer], 0
+	je .back
+
+.front:
+	mov edi, VBE_PHYSICAL_BUFFER
+	mov ecx, [screen.screen_size]
+	shr ecx, 2
+	mov eax, ebx
+	rep stosd
+	ret
+
+.back:
 	mov edi, VBE_BACK_BUFFER
 	mov ecx, [screen.screen_size]
 	shr ecx, 2

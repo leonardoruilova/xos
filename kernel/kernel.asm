@@ -189,6 +189,49 @@ kmain32:
 	call com1_detect
 	call install_exceptions
 	call mm_init
+
+	; make a nice boot screen
+	mov ecx, 160*100*4
+	call kmalloc
+	mov [boot_splash_buffer], eax
+
+	; decode the boot splash
+	mov edx, boot_splash
+	mov ebx, [boot_splash_buffer]
+	call decode_bmp
+
+	; display the boot screen
+	call use_back_buffer
+	call unlock_screen
+
+	mov ebx, 0xD8D8D8
+	call clear_screen
+
+	mov eax, [screen.width]
+	mov ebx, [screen.height]
+	shr eax, 1
+	shr ebx, 1
+	sub eax, 160/2
+	sub ebx, 100/2
+	mov si, 160
+	mov di, 100
+	mov edx, [boot_splash_buffer]
+	call blit_buffer_no_transparent
+
+	mov eax, [boot_splash_buffer]
+	call kfree
+
+	mov ebx, 0xD8D8D8
+	mov ecx, 0x000000
+	call set_text_color
+
+	mov ecx, 0
+	mov edx, [screen.height]
+	sub edx, 16
+	mov esi, copyright_str
+	call print_string
+
+	; continue initialization
 	call pic_init
 	call pit_init
 	call syscall_init
@@ -223,6 +266,7 @@ test_task		db "hello.exe",0
 test_task2		db "draw.exe",0
 test_task3		db "button.exe",0
 test_task4		db "calc.exe",0
+boot_splash_buffer	dd 0
 
 ; idle_process:
 ; The only process on the system which runs in ring 0
@@ -300,6 +344,10 @@ idle_process:
 	;include "kernel/usb/ohci.asm"		; USB 1.0 (OHCI)
 	;include "kernel/usb/ehci.asm"		; USB 2.0 (EHCI)
 	;include "kernel/usb/xhci.asm"		; USB 3.0 (xHCI)
+
+	; Boot splash
+	boot_splash:
+	file "kernel/splash.bmp"
 
 	; Default mouse cursor
 	cursor:

@@ -19,6 +19,12 @@ UHCI_COMMAND_RUN		= 0x0001
 UHCI_COMMAND_HOST_RESET		= 0x0002
 UHCI_COMMAND_GLOBAL_RESET	= 0x0004
 
+; UHCI Status Register
+UHCI_STATUS_HALTED		= 0x0020
+UHCI_STATUS_PROCESS_ERROR	= 0x0010
+UHCI_STATUS_PCI_ERROR		= 0x0008
+UHCI_STATUS_ERROR_INTERRUPT	= 0x0002
+
 ; UHCI Port Command/Status
 UHCI_PORT_CONNECT		= 0x0001
 UHCI_PORT_CONNECT_CHANGE	= 0x0002
@@ -27,6 +33,11 @@ UHCI_PORT_ENABLE_CHANGE		= 0x0008
 UHCI_PORT_DEVICE_SPEED		= 0x0100	; set = low speed; clear = high speed
 UHCI_PORT_RESET			= 0x0200
 UHCI_PORT_SUSPEND		= 0x1000
+
+; UHCI Packet Types
+UHCI_PACKET_IN			= 0x69
+UHCI_PACKET_OUT			= 0xE1
+UHCI_PACKET_SETUP		= 0x2D
 
 align 4
 uhci_pci		dd 0
@@ -147,8 +158,7 @@ uhci_init_controller:
 	mov bh, PCI_STATUS_COMMAND
 	call pci_read_dword
 
-	or eax, 5		; enable IO, DMA
-	and eax, not 0x400	; enable IRQs
+	or eax, 0x405	; disable IRQs, enable IO and DMA
 
 	push eax
 
@@ -217,10 +227,10 @@ uhci_reset:
 	out dx, ax
 	call iowait
 
-	; enable interrupts
+	; disable interrupts
 	mov dx, [.io]
 	add dx, UHCI_REGISTER_IRQ
-	mov ax, 0xF
+	mov ax, 0
 	out dx, ax
 
 	; reset the two ports
@@ -254,8 +264,198 @@ uhci_reset:
 	out dx, ax
 	call iowait
 
+	mov dx, [.io]
+	add dx, UHCI_REGISTER_START_OF_FRAME
+	mov ax, 0x40
+	out dx, al
+
+	mov dx, [.io]
+	mov ax, 0x80
+	out dx, ax
+
+	mov dx, [.io]
+	add dx, UHCI_REGISTER_STATUS
+	mov ax, 0x3F
+	out dx, ax
+
 	ret
 
 .io			dw 0
+
+; uhci_control:
+; Sends a control packet
+; In\	EAX = Pointer to USB device
+; In\	BL = Port number
+; In\	BH = Request flags
+; In\	CL = Request byte
+; In\	DX = Request value
+; In\	EDX (high word) = Request index
+; In\	SI = Data size
+; In\	EDI = If data size exists, pointer to data area
+; Out\	EAX = 0 on success
+
+uhci_control:
+	mov [.port], bl
+
+	; construct setup packet
+	mov [usb_setup_packet.request_flags], bh
+	mov [usb_setup_packet.request], cl
+	mov [usb_setup_packet.value], dx
+	shr edx, 16
+	mov [usb_setup_packet.index], dx
+	mov [usb_setup_packet.length], si
+
+	mov [.buffer], edi
+
+	mov dx, [eax+USB_CONTROLLER_BASE]
+	and dx, 0xFFFC
+	mov [.io], dx		; uhci io base
+
+	; construct the first TD
+	mov [uhci_td1.next], 0x00000001		; invalid entry
+	mov [uhci_td1.status], 1 shl 26
+	mov eax, 7	; size of packet - 1
+	shl eax, 21
+
+	movzx ebx, [.port]
+	shl ebx, 8
+	or eax, ebx
+	or eax, UHCI_PACKET_SETUP
+	mov [uhci_td1.size_id], eax
+	mov [uhci_td1.buffer], usb_setup_packet
+
+	; if there is a data packet, construct the second TD
+	cmp [usb_setup_packet.length], 0
+	je .start
+
+	mov [uhci_td1.next], uhci_td2
+	mov [uhci_td2.next], 0x00000001		; invalid entry
+	mov [uhci_td2.status], 1 shl 26
+	movzx eax, [usb_setup_packet.length]
+	dec eax		; size - 1
+	shl eax, 21
+	or eax, UHCI_PACKET_IN
+
+	movzx ebx, [.port]
+	shl ebx, 8
+	or eax, ebx
+	mov [uhci_td2.size_id], eax
+	mov eax, [.buffer]
+	mov [uhci_td2.buffer], eax
+
+.start:
+	wbinvd
+
+	; construct the frame list
+	mov dword[uhci_frame_list], uhci_td1
+	mov dword[uhci_frame_list+4], 0x00000001	; invalid entry
+
+	mov dx, [.io]
+	add dx, UHCI_REGISTER_STATUS
+	mov ax, 0x3F
+	out dx, ax
+
+	; tell the uhci where the frame list is
+	mov dx, [.io]
+	add dx, UHCI_REGISTER_FRAME_NUMBER
+	xor ax, ax	; first TD
+	out dx, ax
+
+	mov dx, [.io]
+	add dx, UHCI_REGISTER_FRAME_BASE
+	mov eax, uhci_frame_list
+	out dx, eax
+	call iowait
+
+	; execute the schedule
+	mov dx, [.io]
+	in ax, dx
+	or ax, UHCI_COMMAND_RUN
+	out dx, ax
+
+	jmp $
+
+.finish:
+	mov dx, [.io]
+	in ax, dx
+	and ax, not UHCI_COMMAND_RUN
+	out dx, ax
+	call iowait
+
+	mov esi, .finish_msg
+	call kprint
+
+	mov eax, 0
+	ret
+
+.process_error:
+	mov esi, .process_error_msg
+	call kprint
+
+	mov eax, 0
+	ret
+
+.pci_error:
+	mov esi, .pci_error_msg
+	call kprint
+
+	mov eax, 0
+	ret
+
+.interrupt_error:
+	mov esi, .interrupt_error_msg
+	call kprint
+
+	mov eax, 0
+	ret
+
+.port			db 0
+.buffer			dd 0
+.io			dw 0	; io port
+.finish_msg		db "usb-uhci: sent control packet successfully...",10,0
+.process_error_msg	db "usb-uhci: process error in control packet.",10,0
+.pci_error_msg		db "usb-uhci: PCI error in control packet.",10,0
+.interrupt_error_msg	db "usb-uhci: interrupt error in control packet.",10,0
+
+
+; UHCI Transfer Descriptors... ;)
+
+align 32
+uhci_td1:
+	.next		dd 0x00000001
+	.status		dd 0x4000000	; low speed device for now
+	.size_id	dd 0
+	.buffer		dd 0
+	times 4		dd 0
+
+align 32
+uhci_td2:
+	.next		dd 0x00000001
+	.status		dd 0x4000000
+	.size_id	dd 0
+	.buffer		dd 0
+	times 4		dd 0
+
+align 32
+uhci_td3:
+	.next		dd 0x00000001
+	.status		dd 0x4000000
+	.size_id	dd 0
+	.buffer		dd 0
+	times 4		dd 0
+
+align 32
+uhci_td4:
+	.next		dd 0x00000001
+	.status		dd 0x4000000
+	.size_id	dd 0
+	.buffer		dd 0
+	times 4		dd 0
+
+align 4096
+uhci_frame_list:
+	dd uhci_td1
+	dd 1
+
 
 

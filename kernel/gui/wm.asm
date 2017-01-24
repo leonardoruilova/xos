@@ -63,7 +63,7 @@ wm_running			db 0
 ; Window Theme!
 ; TO-DO: Set these values from a theme file from the disk (i.e. make the gui customizable)
 align 4
-wm_color			dd 0x00B0B0
+wm_color			dd 0x808080
 ;wm_color			dd 0x004288
 window_title			dd 0xFFFFFF
 window_inactive_title		dd 0xC0C0C0
