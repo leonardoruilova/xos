@@ -52,6 +52,12 @@ wm_read_mouse:
 	call wm_get_window
 	jc .error
 
+	test dx, WM_NO_FRAME
+	jnz .frameless
+
+	test dx, WM_TRANSPARENT
+	jnz .frameless
+
 	mov ecx, [mouse_x]
 	mov edx, [mouse_y]
 	sub cx, ax
@@ -59,11 +65,19 @@ wm_read_mouse:
 	sub cx, [window_canvas_x]
 	sub dx, [window_canvas_y]
 
+.finish:
 	test cx, 0x8000
 	jnz .error
 	test dx, 0x8000
 	jnz .error
 	ret
+
+.frameless:
+	mov ecx, [mouse_x]
+	mov edx, [mouse_y]
+	sub cx, ax
+	sub dx, bx
+	jmp .finish
 
 .error:
 	xor cx, cx

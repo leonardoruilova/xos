@@ -67,7 +67,6 @@ align 4
 usb_controllers			dd 0
 usb_controller_count		dd 0
 usb_setup_packet		dd 0
-usb_device_descriptor		dd 0
 
 ; usb_init:
 ; Initializes USB controllers
@@ -104,9 +103,14 @@ usb_init:
 	;mov bl, 1
 	;mov cx, 0x0100
 	;mov dx, 0
-	;mov si, 8
-	;mov edi, [usb_device_descriptor]
+	;mov si, 18
+	;mov edi, usb_device_descriptor
 	;call usb_get_descriptor
+
+	;mov edi, usb_device_descriptor
+	;mov eax, [edi]
+	;call int_to_string
+	;call kprint
 
 	ret
 
@@ -317,6 +321,24 @@ usb_get_descriptor:
 .language		dw 0
 .length			dw 0
 .buffer			dd 0
+
+; USB Device Descriptor
+align 16
+usb_device_descriptor:
+	.length			db 0	; 0x12
+	.type			db 0	; USB_DESCRIPTOR_DEVICE
+	.usb_version		dw 0	; BCD
+	.class			db 0
+	.subclass		db 0
+	.protocol		db 0
+	.max_packet		db 0
+	.vendor			dw 0
+	.device			dw 0
+	.device_version		dw 0
+	.manufacturer		db 0
+	.product		db 0
+	.serial_number		db 0
+	.configurations		db 0
 
 
 

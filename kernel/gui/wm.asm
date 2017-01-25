@@ -43,6 +43,10 @@ WINDOW_HANDLE_SIZE		= 0x80
 ; Window Flags
 WM_PRESENT			= 0x0001
 WM_NO_FRAME			= 0x0002
+WM_TRANSPARENT			= 0x0004
+
+; Window Transparent Color
+WINDOW_TRANSPARENT_COLOR	= 0xD0D0D0
 
 ; Window Events
 WM_LEFT_CLICK			= 0x0001
@@ -309,6 +313,12 @@ wm_make_handle:
 	shl eax, 7
 	add eax, [window_handles]
 
+	mov edx, [.framebuffer]
+	mov [eax+WINDOW_FRAMEBUFFER], edx
+
+	movzx edx, [current_task]	; pid of the running process
+	mov [eax+WINDOW_PID], edx
+
 	mov dx, [.flags]
 	or dx, WM_PRESENT
 	mov [eax], dx
@@ -325,6 +335,12 @@ wm_make_handle:
 	mov dx, [.height]
 	mov [eax+WINDOW_HEIGHT], dx
 
+	test [.flags], WM_TRANSPARENT	; transparent windows can't be moved
+	jnz .finish
+
+	test [.flags], WM_NO_FRAME	; same for frameless windows
+	jnz .finish
+
 	mov edx, [screen.width]
 	sub dx, [.width]
 	sub dx, [window_border_x_min]
@@ -335,12 +351,7 @@ wm_make_handle:
 	sub dx, [window_border_y_min]
 	mov [eax+WINDOW_MAX_Y], dx
 
-	mov edx, [.framebuffer]
-	mov [eax+WINDOW_FRAMEBUFFER], edx
-
-	movzx edx, [current_task]	; pid of the running process
-	mov [eax+WINDOW_PID], edx
-
+.finish:
 	ret
 
 .x			dw 0
@@ -611,6 +622,12 @@ align 32
 	mov [.framebuffer], ecx
 	mov [.title], ebp
 
+	test dx, WM_NO_FRAME
+	jnz .no_frame
+
+	test dx, WM_TRANSPARENT
+	jnz .transparent
+
 	; draw the window border
 	mov ax, [.x]
 	mov bx, [.y]
@@ -671,6 +688,12 @@ align 32
 	mov [.framebuffer], ecx
 	mov [.title], ebp
 
+	test dx, WM_NO_FRAME
+	jnz .focused_no_frame
+
+	test dx, WM_TRANSPARENT
+	jnz .focused_transparent
+
 	; draw the window border
 	mov ax, [.x]
 	mov bx, [.y]
@@ -718,18 +741,76 @@ align 32
 	add bx, [window_canvas_y]
 	mov edx, [.framebuffer]
 	call blit_buffer_no_transparent
-	jmp .done
 
 .done:
 	;mov [wm_dirty], 0
 	call redraw_mouse	; this takes care of all the dirty work before actually drawing the cursor ;)
 	ret
 
+.focused_transparent:
+	mov ax, [.x]
+	mov bx, [.y]
+	mov si, [.width]
+	mov di, [.height]
+	mov edx, [window_active_border]
+	mov cl, 1
+	call alpha_fill_rect
+
+	mov ax, [.x]
+	mov bx, [.y]
+	mov si, [.width]
+	mov di, [.height]
+	mov ecx, WINDOW_TRANSPARENT_COLOR
+	mov edx, [.framebuffer]
+	call blit_buffer
+	jmp .done
+
+.focused_no_frame:
+	mov ax, [.x]
+	mov bx, [.y]
+	mov si, [.width]
+	mov di, [.height]
+	mov edx, [.framebuffer]
+	call blit_buffer_no_transparent
+	jmp .done
+
+.transparent:
+	mov ax, [.x]
+	mov bx, [.y]
+	mov si, [.width]
+	mov di, [.height]
+	mov edx, [window_border]
+	mov cl, 1
+	call alpha_fill_rect
+
+	mov ax, [.x]
+	mov bx, [.y]
+	mov si, [.width]
+	mov di, [.height]
+	mov ecx, WINDOW_TRANSPARENT_COLOR
+	mov edx, [.framebuffer]
+	call blit_buffer
+
+	jmp .next
+
+.no_frame:
+	mov ax, [.x]
+	mov bx, [.y]
+	mov si, [.width]
+	mov di, [.height]
+	mov edx, [.framebuffer]
+	call blit_buffer_no_transparent
+
+	jmp .next
+
+align 4
 .handle			dd 0
+align 2
 .x			dw 0
 .y			dw 0
 .width			dw 0
 .height			dw 0
+align 4
 .framebuffer		dd 0
 .title			dd 0
 
@@ -769,6 +850,13 @@ wm_mouse_event:
 	shl eax, 7
 	add eax, [window_handles]
 
+	; check if the window has a title bar at all
+	test word[eax+WINDOW_FLAGS], WM_NO_FRAME
+	jnz .frameless
+
+	test word[eax+WINDOW_FLAGS], WM_TRANSPARENT
+	jnz .frameless
+
 	mov ecx, [mouse_y]
 	mov dx, [eax+WINDOW_Y]
 	add dx, [window_border_y_min]
@@ -784,6 +872,32 @@ wm_mouse_event:
 	or word[eax+WINDOW_EVENT], WM_LEFT_CLICK
 	;mov [wm_dirty], 1
 
+	jmp .done
+
+.frameless:
+	; ensure the window has been clicked
+	mov edx, [mouse_x]
+	cmp dx, [eax+WINDOW_X]
+	jl .done
+
+	mov dx, [eax+WINDOW_X]
+	add dx, [eax+WINDOW_WIDTH]
+	and edx, 0xFFFF
+	cmp edx, [mouse_x]
+	jl .done
+
+	mov edx, [mouse_y]
+	cmp dx, [eax+WINDOW_Y]
+	jl .done
+
+	mov dx, [eax+WINDOW_Y]
+	add dx, [eax+WINDOW_HEIGHT]
+	and edx, 0xFFFF
+	cmp edx, [mouse_y]
+	jl .done
+
+	; send a click event
+	or word[eax+WINDOW_EVENT], WM_LEFT_CLICK
 	jmp .done
 
 .check_exit:
@@ -840,6 +954,13 @@ wm_mouse_event:
 	mov esi, [active_window]
 	shl esi, 7	; mul 128
 	add esi, [window_handles]
+
+	; frameless windows and transparent windows cannot be dragged like this
+	test word[esi+WINDOW_FLAGS], WM_NO_FRAME
+	jnz .done
+
+	test word[esi+WINDOW_FLAGS], WM_TRANSPARENT
+	jnz .done
 
 	; make sure the mouse is actually on the window title bar
 	mov ecx, [mouse_y]

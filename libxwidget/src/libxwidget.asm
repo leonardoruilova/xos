@@ -21,6 +21,10 @@ use32
 	WM_KEYPRESS		= 0x0004
 	WM_CLOSE		= 0x0008
 
+	; Window Flags
+	WM_NO_FRAME		= 0x0002
+	WM_TRANSPARENT		= 0x0004
+
 	XWIDGET_BUTTON		= 0x0001	; button click event
 	XWIDGET_CLOSE		= 0x0002	; close event
 

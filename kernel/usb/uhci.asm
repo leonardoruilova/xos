@@ -24,6 +24,7 @@ UHCI_STATUS_HALTED		= 0x0020
 UHCI_STATUS_PROCESS_ERROR	= 0x0010
 UHCI_STATUS_PCI_ERROR		= 0x0008
 UHCI_STATUS_INTERRUPT_ERROR	= 0x0002
+UHCI_STATUS_IOC			= 0x0001
 
 ; UHCI Port Command/Status
 UHCI_PORT_CONNECT		= 0x0001
@@ -355,29 +356,120 @@ uhci_control:
 	and dx, 0xFFFC
 	mov [.io], dx		; uhci io base
 
-	; tell the device where the frame list is
-	mov dx, [.io]
-	add dx, UHCI_REGISTER_STATUS
-	mov ax, 0x3F
-	out dx, ax
+	; create the frame list
+	mov edi, [uhci_frame_list]
+	mov eax, [uhci_td_physical]
+	or eax, 2		; point at QH not TD
+	stosd
+	mov eax, 0x00000001	; invalid entry
+	stosd
 
-	mov dx, [.io]
-	add dx, UHCI_REGISTER_FRAME_BASE
-	mov eax, uhci_frame_list
-	out dx, eax
+	; create the first QH
+	mov edi, [uhci_td]
+	mov eax, 0x00000001	; invalid entry
+	stosd
+	mov eax, [uhci_td_physical]	; first transfer descriptor
+	add eax, 32
+	stosd
+	mov eax, 0
+	stosd
+	stosd
+	stosd
+	stosd
 
-	mov dx, [.io]
-	add dx, UHCI_REGISTER_FRAME_NUMBER
-	mov ax, 0
-	out dx, ax
+	; construct first TD
+	mov edi, [uhci_td]
+	add edi, 32
+	mov eax, [uhci_td_physical]
+	add eax, 64		; second TD
+	stosd
+	mov eax, (1 shl 26) or (11b shl 27) or (1 shl 23)	; low speed, 3 error limit, active
+	stosd
+	mov eax, 7
+	shl eax, 21
+	or eax, UHCI_PACKET_SETUP
+	stosd
 
-	cli
-	hlt
+	mov eax, [usb_setup_packet]
+	call vmm_get_page
 
+	stosd
+
+	mov eax, 0
+	stosd
+	stosd
+	stosd
+	stosd
+
+	; if there is a data packet, construct the second TD
+	mov esi, [usb_setup_packet]
+	cmp word[esi+USB_SETUP_LENGTH], 0
+	je .no_data
+
+	; construct second TD
+	mov edi, [uhci_td]
+	add edi, 64
+	mov eax, [uhci_td_physical]
+	add eax, 64+32		; third TD
+	stosd
+	mov eax, (1 shl 26) or (11b shl 27) or (1 shl 23)	; low speed, 3 error limit, active
+	stosd
+	mov esi, [usb_setup_packet]
+	movzx eax, word[esi+USB_SETUP_LENGTH]
+	dec eax
+	shl eax, 21
+	or eax, UHCI_PACKET_IN
+	or eax, 1 shl 19	; data1
+	stosd
+
+	mov eax, [.buffer]
+	and eax, 0xFFFFF000
+	call vmm_get_page
+	mov ebx, [.buffer]
+	and ebx, 0xFFFF
+	or eax, ebx
+	stosd
+
+	mov eax, 0
+	stosd
+	stosd
+	stosd
+	stosd
+
+	; construct third TD
+	mov edi, [uhci_td]
+	add edi, 64+32
+	mov eax, 0x00000001	; invalid entry
+	stosd
+	mov eax, (1 shl 26) or (11b shl 27) or (1 shl 23) or (1 shl 24)
+	stosd
+	mov eax, 0x7FF
+	shl eax, 21
+	or eax, UHCI_PACKET_OUT
+	;or eax, 1 shl 19	; data1
+	stosd
+
+	mov eax, 0	; buffer..
+	stosd
+
+	mov eax, 0
+	stosd
+	stosd
+	stosd
+	stosd
+
+	jmp .start
+
+.no_data:
+	mov edi, [uhci_td]
+	add edi, 32
+	mov eax, 0x00000001	; invalid entry
+	stosd
 
 .start:
 	wbinvd
 
+	; tell the uhci where the frame list is
 	mov dx, [.io]
 	add dx, UHCI_REGISTER_FRAME_BASE
 	mov eax, [uhci_frame_list_physical]
@@ -414,6 +506,9 @@ uhci_control:
 	test ax, UHCI_STATUS_HALTED
 	jnz .finish
 
+	test ax, UHCI_STATUS_IOC
+	jnz .finish
+
 	jmp .wait_finish
 
 .finish:
@@ -421,7 +516,11 @@ uhci_control:
 	in ax, dx
 	and ax, not UHCI_COMMAND_RUN
 	out dx, ax
-	call iowait
+
+	mov dx, [.io]
+	add dx, UHCI_REGISTER_STATUS
+	mov ax, 0x3F	; clear status
+	out dx, ax
 
 	mov esi, .finish_msg
 	call kprint
@@ -430,24 +529,54 @@ uhci_control:
 	ret
 
 .process_error:
+	mov dx, [.io]
+	in ax, dx
+	and ax, not UHCI_COMMAND_RUN
+	out dx, ax
+
+	mov dx, [.io]
+	add dx, UHCI_REGISTER_STATUS
+	mov ax, 0x3F	; clear status
+	out dx, ax
+
 	mov esi, .process_error_msg
 	call kprint
 
-	mov eax, 0
+	mov eax, -1
 	ret
 
 .pci_error:
+	mov dx, [.io]
+	in ax, dx
+	and ax, not UHCI_COMMAND_RUN
+	out dx, ax
+
+	mov dx, [.io]
+	add dx, UHCI_REGISTER_STATUS
+	mov ax, 0x3F	; clear status
+	out dx, ax
+
 	mov esi, .pci_error_msg
 	call kprint
 
-	mov eax, 0
+	mov eax, -1
 	ret
 
 .interrupt_error:
+	mov dx, [.io]
+	in ax, dx
+	and ax, not UHCI_COMMAND_RUN
+	out dx, ax
+
+	mov dx, [.io]
+	add dx, UHCI_REGISTER_STATUS
+	mov ax, 0x3F	; clear status
+	out dx, ax
+
 	mov esi, .interrupt_error_msg
 	call kprint
 
-	mov eax, 0
+	mov eax, -1
 	ret
 
 .port			db 0

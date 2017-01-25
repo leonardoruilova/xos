@@ -246,6 +246,7 @@ kmain32:
 	call ps2_init
 	call wm_init
 	call use_back_buffer
+
 	call unlock_screen
 
 	mov esi, test_task
@@ -269,6 +270,7 @@ test_task4		db "calc.exe",0
 boot_splash_buffer	dd 0
 
 ; idle_process:
+
 ; The only process on the system which runs in ring 0
 ; All it does is keep the CPU halted until it's time for a task switch or IRQ
 ; This cools down the CPU and is needed on overclocked laptops to prevent overheating
