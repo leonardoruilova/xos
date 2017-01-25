@@ -23,7 +23,7 @@ UHCI_COMMAND_GLOBAL_RESET	= 0x0004
 UHCI_STATUS_HALTED		= 0x0020
 UHCI_STATUS_PROCESS_ERROR	= 0x0010
 UHCI_STATUS_PCI_ERROR		= 0x0008
-UHCI_STATUS_ERROR_INTERRUPT	= 0x0002
+UHCI_STATUS_INTERRUPT_ERROR	= 0x0002
 
 ; UHCI Port Command/Status
 UHCI_PORT_CONNECT		= 0x0001
@@ -39,9 +39,20 @@ UHCI_PACKET_IN			= 0x69
 UHCI_PACKET_OUT			= 0xE1
 UHCI_PACKET_SETUP		= 0x2D
 
+; UHCI Descriptor Size
+UHCI_TD_SIZE			= 32
+
 align 4
-uhci_pci		dd 0
-uhci_count		dd 0
+uhci_pci			dd 0
+uhci_count			dd 0
+
+; UHCI Descriptors... ;)
+
+align 4
+uhci_td				dd 0
+uhci_td_physical		dd 0
+uhci_frame_list			dd 0
+uhci_frame_list_physical	dd 0
 
 ; uhci_detect:
 ; Detects and initializes UHCI controllers
@@ -69,6 +80,32 @@ uhci_detect:
 	mov esi, .count_msg2
 	call kprint
 
+	; allocate memory
+	mov eax, KERNEL_HEAP
+	mov ecx, 1
+	mov dl, PAGE_PRESENT or PAGE_WRITEABLE or PAGE_NO_CACHE
+	call vmm_alloc
+	mov [uhci_frame_list], eax
+
+	call vmm_get_page
+	mov [uhci_frame_list_physical], eax
+
+	mov eax, KERNEL_HEAP
+	mov ecx, 1
+	mov dl, PAGE_PRESENT or PAGE_WRITEABLE or PAGE_NO_CACHE
+	call vmm_alloc
+	mov [uhci_td], eax
+
+	call vmm_get_page
+	mov [uhci_td_physical], eax
+
+	; fill frame list with invalid pointers
+	mov edi, [uhci_frame_list]
+	mov eax, 0x00000001
+	mov ecx, 1024
+	rep stosd
+
+	; initialize each uhci controller in order
 	mov [.current_count], 0
 
 .initialize_loop:
@@ -201,18 +238,20 @@ uhci_reset:
 	and eax, 0xFFFC
 	mov [.io], ax
 
-	; do a host controller reset first
+	; turn off the uhci
 	mov dx, [.io]
-	mov ax, UHCI_COMMAND_HOST_RESET
+	mov ax, 0
 	out dx, ax
-	call iowait
 
-.wait_for_host:
-	call iowait
+.wait_halt:
+	mov dx, [.io]
+	add dx, UHCI_REGISTER_STATUS
 	in ax, dx
-	test ax, UHCI_COMMAND_HOST_RESET
-	jnz .wait_for_host
+	test ax, UHCI_STATUS_HALTED
+	jnz .start
+	jmp .wait_halt
 
+.start:
 	; global reset
 	mov dx, [.io]
 	mov ax, UHCI_COMMAND_GLOBAL_RESET
@@ -265,17 +304,22 @@ uhci_reset:
 	call iowait
 
 	mov dx, [.io]
+	add dx, UHCI_REGISTER_FRAME_BASE
+	mov eax, [uhci_frame_list_physical]
+	out dx, eax	; frame list base
+
+	mov dx, [.io]
 	add dx, UHCI_REGISTER_START_OF_FRAME
-	mov ax, 0x40
+	mov ax, 0x40	; 1ms
 	out dx, al
 
 	mov dx, [.io]
-	mov ax, 0x80
+	mov ax, 0x80	; max packet = 64 bytes
 	out dx, ax
 
 	mov dx, [.io]
 	add dx, UHCI_REGISTER_STATUS
-	mov ax, 0x3F
+	mov ax, 0x3F	; clear status
 	out dx, ax
 
 	ret
@@ -296,84 +340,81 @@ uhci_reset:
 
 uhci_control:
 	mov [.port], bl
+	mov [.buffer], edi
 
 	; construct setup packet
-	mov [usb_setup_packet.request_flags], bh
-	mov [usb_setup_packet.request], cl
-	mov [usb_setup_packet.value], dx
+	mov edi, [usb_setup_packet]
+	mov [edi+USB_SETUP_REQUEST_FLAGS], bh
+	mov [edi+USB_SETUP_REQUEST], cl
+	mov [edi+USB_SETUP_VALUE], dx
 	shr edx, 16
-	mov [usb_setup_packet.index], dx
-	mov [usb_setup_packet.length], si
-
-	mov [.buffer], edi
+	mov [edi+USB_SETUP_INDEX], dx
+	mov [edi+USB_SETUP_LENGTH], si
 
 	mov dx, [eax+USB_CONTROLLER_BASE]
 	and dx, 0xFFFC
 	mov [.io], dx		; uhci io base
 
-	; construct the first TD
-	mov [uhci_td1.next], 0x00000001		; invalid entry
-	mov [uhci_td1.status], 1 shl 26
-	mov eax, 7	; size of packet - 1
-	shl eax, 21
-
-	movzx ebx, [.port]
-	shl ebx, 8
-	or eax, ebx
-	or eax, UHCI_PACKET_SETUP
-	mov [uhci_td1.size_id], eax
-	mov [uhci_td1.buffer], usb_setup_packet
-
-	; if there is a data packet, construct the second TD
-	cmp [usb_setup_packet.length], 0
-	je .start
-
-	mov [uhci_td1.next], uhci_td2
-	mov [uhci_td2.next], 0x00000001		; invalid entry
-	mov [uhci_td2.status], 1 shl 26
-	movzx eax, [usb_setup_packet.length]
-	dec eax		; size - 1
-	shl eax, 21
-	or eax, UHCI_PACKET_IN
-
-	movzx ebx, [.port]
-	shl ebx, 8
-	or eax, ebx
-	mov [uhci_td2.size_id], eax
-	mov eax, [.buffer]
-	mov [uhci_td2.buffer], eax
-
-.start:
-	wbinvd
-
-	; construct the frame list
-	mov dword[uhci_frame_list], uhci_td1
-	mov dword[uhci_frame_list+4], 0x00000001	; invalid entry
-
+	; tell the device where the frame list is
 	mov dx, [.io]
 	add dx, UHCI_REGISTER_STATUS
 	mov ax, 0x3F
-	out dx, ax
-
-	; tell the uhci where the frame list is
-	mov dx, [.io]
-	add dx, UHCI_REGISTER_FRAME_NUMBER
-	xor ax, ax	; first TD
 	out dx, ax
 
 	mov dx, [.io]
 	add dx, UHCI_REGISTER_FRAME_BASE
 	mov eax, uhci_frame_list
 	out dx, eax
-	call iowait
 
-	; execute the schedule
 	mov dx, [.io]
-	in ax, dx
-	or ax, UHCI_COMMAND_RUN
+	add dx, UHCI_REGISTER_FRAME_NUMBER
+	mov ax, 0
 	out dx, ax
 
-	jmp $
+	cli
+	hlt
+
+
+.start:
+	wbinvd
+
+	mov dx, [.io]
+	add dx, UHCI_REGISTER_FRAME_BASE
+	mov eax, [uhci_frame_list_physical]
+	out dx, eax
+
+	mov dx, [.io]
+	add dx, UHCI_REGISTER_FRAME_NUMBER
+	mov ax, 0
+	out dx, ax
+
+	call iowait
+	call iowait
+
+	mov dx, [.io]
+	in ax, dx
+	mov ax, UHCI_COMMAND_RUN
+	out dx, ax
+	call iowait
+
+.wait_finish:
+	mov dx, [.io]
+	add dx, UHCI_REGISTER_STATUS
+	in ax, dx
+
+	test ax, UHCI_STATUS_PCI_ERROR
+	jnz .pci_error
+
+	test ax, UHCI_STATUS_INTERRUPT_ERROR
+	jnz .interrupt_error
+
+	test ax, UHCI_STATUS_PROCESS_ERROR
+	jnz .process_error
+
+	test ax, UHCI_STATUS_HALTED
+	jnz .finish
+
+	jmp .wait_finish
 
 .finish:
 	mov dx, [.io]
@@ -416,46 +457,6 @@ uhci_control:
 .process_error_msg	db "usb-uhci: process error in control packet.",10,0
 .pci_error_msg		db "usb-uhci: PCI error in control packet.",10,0
 .interrupt_error_msg	db "usb-uhci: interrupt error in control packet.",10,0
-
-
-; UHCI Transfer Descriptors... ;)
-
-align 32
-uhci_td1:
-	.next		dd 0x00000001
-	.status		dd 0x4000000	; low speed device for now
-	.size_id	dd 0
-	.buffer		dd 0
-	times 4		dd 0
-
-align 32
-uhci_td2:
-	.next		dd 0x00000001
-	.status		dd 0x4000000
-	.size_id	dd 0
-	.buffer		dd 0
-	times 4		dd 0
-
-align 32
-uhci_td3:
-	.next		dd 0x00000001
-	.status		dd 0x4000000
-	.size_id	dd 0
-	.buffer		dd 0
-	times 4		dd 0
-
-align 32
-uhci_td4:
-	.next		dd 0x00000001
-	.status		dd 0x4000000
-	.size_id	dd 0
-	.buffer		dd 0
-	times 4		dd 0
-
-align 4096
-uhci_frame_list:
-	dd uhci_td1
-	dd 1
 
 
 

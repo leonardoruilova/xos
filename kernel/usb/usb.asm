@@ -56,9 +56,18 @@ USB_DESCRIPTOR_STRING		= 0x03
 USB_DESCRIPTOR_INTERFACE	= 0x04
 USB_DESCRIPTOR_ENDPOINT		= 0x05
 
+; USB Setup Packet Structure
+USB_SETUP_REQUEST_FLAGS		= 0x00	; u8
+USB_SETUP_REQUEST		= 0x01	; u8
+USB_SETUP_VALUE			= 0x02	; u16
+USB_SETUP_INDEX			= 0x04	; u16
+USB_SETUP_LENGTH		= 0x06	; u16
+
 align 4
 usb_controllers			dd 0
 usb_controller_count		dd 0
+usb_setup_packet		dd 0
+usb_device_descriptor		dd 0
 
 ; usb_init:
 ; Initializes USB controllers
@@ -76,42 +85,32 @@ usb_init:
 	;call ehci_detect
 	;call xhci_detect
 
-	mov eax, 0
-	mov bl, 1
-	mov bh, 0
-	mov cl, USB_CLEAR_FEATURE
-	mov edx, 0
-	mov si, 0
-	mov edi, 0
-	call usb_control
+	mov eax, KERNEL_HEAP
+	mov ecx, 1
+	mov dl, PAGE_PRESENT or PAGE_WRITEABLE or PAGE_NO_CACHE
+	call vmm_alloc
+	mov [usb_setup_packet], eax
 
-	movzx eax, [usb_device_descriptor.size]
-	call int_to_string
-	call kprint
+	mov eax, KERNEL_HEAP
+	mov ecx, 1
+	mov dl, PAGE_PRESENT or PAGE_WRITEABLE or PAGE_NO_CACHE
+	call vmm_alloc
+	mov [usb_device_descriptor], eax
 
-	cli
-	hlt
+	; ---
+	; JUST TESTING
+	; ---
+	;mov eax, 0
+	;mov bl, 1
+	;mov cx, 0x0100
+	;mov dx, 0
+	;mov si, 8
+	;mov edi, [usb_device_descriptor]
+	;call usb_get_descriptor
 
 	ret
 
 .msg				db "usb: detecting USB controllers...",10,0
-
-align 16
-usb_device_descriptor:
-	.size			db 0
-	.type			db 0
-	.version		dw 0
-	.class			db 0
-	.sublass		db 0
-	.protocol		db 0
-	.max_packet		db 0
-	.vendor			dw 0
-	.device			dw 0
-	.release		dw 0
-	.manufacturer		db 0
-	.product		db 0
-	.serial			db 0
-	.configurations		db 0
 
 ; usb_register:
 ; Registers a USB device
@@ -318,16 +317,6 @@ usb_get_descriptor:
 .language		dw 0
 .length			dw 0
 .buffer			dd 0
-
-; USB Setup Packet
-
-align 32
-usb_setup_packet:
-	.request_flags		db 0
-	.request		db 0
-	.value			dw 0
-	.index			dw 0
-	.length			dw 0
 
 
 
