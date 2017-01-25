@@ -231,6 +231,25 @@ kmain32:
 	mov esi, copyright_str
 	call print_string
 
+	; decode mouse cursor
+	mov ecx, 64*64*4
+	call kmalloc
+	mov [mouse_cursor], eax
+
+	mov edx, cursor
+	mov ebx, [mouse_cursor]
+	call decode_bmp
+	mov [mouse_width], esi
+	mov [mouse_height], edi
+
+	mov eax, [screen.width]
+	sub eax, [mouse_width]
+	mov [mouse_x_max], eax
+
+	mov eax, [screen.height]
+	sub eax, [mouse_height]
+	mov [mouse_y_max], eax
+
 	; continue initialization
 	call pic_init
 	call pit_init
@@ -270,7 +289,6 @@ test_task4		db "calc.exe",0
 boot_splash_buffer	dd 0
 
 ; idle_process:
-
 ; The only process on the system which runs in ring 0
 ; All it does is keep the CPU halted until it's time for a task switch or IRQ
 ; This cools down the CPU and is needed on overclocked laptops to prevent overheating

@@ -110,19 +110,44 @@ acpi_init:
 	mov [acpi_support], 1
 
 	call enable_acpi	; Enable ACPI
+
+	; test for PS/2 controller precense
+	cmp [acpi_fadt.revision], 2
+	jl .ps2_old_fadt
+
+	test [acpi_fadt.boot_arch_flags], 2
+	jz .no_ps2
+
+	jmp .ps2
+
+.ps2_old_fadt:
+	mov esi, .ps2_old_fadt_msg
+	call kprint
+	mov [ps2_present], 1
+	ret
+
+.ps2:
+	mov esi, .ps2_found_msg
+	call kprint
+	mov [ps2_present], 1
+	ret
+
+.no_ps2:
+	mov esi, .no_ps2_msg
+	call kprint
+	mov [ps2_present], 0
 	ret
 
 .no:
-	mov [acpi_rsdt], 0
-	mov [acpi_tables], 0
 	mov esi, .no_msg
-	call kprint
-
-	ret
+	jmp early_boot_error	; require acpi support
 
 .found_msg		db "Found ACPI revision 0x",0
 .no_msg			db "ACPI tables not found.",10,0
 .rsd_ptr		db "RSD PTR "
+.ps2_found_msg		db "acpi: PS/2 controller is present.",10,0
+.no_ps2_msg		db "acpi: PS/2 controller is not present.",10,0
+.ps2_old_fadt_msg	db "acpi: FADT not capable enough to determine PS/2; assuming one exists...",10,0
 
 ; acpi_find_table:
 ; Searches for an ACPI table

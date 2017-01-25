@@ -32,8 +32,8 @@ run:
 runsata:
 	qemu-system-i386 -m 128 -vga std -serial stdio -device ahci,id=ahci -drive if=none,file=disk.hdd,id=xosdrive -device ide-drive,drive=xosdrive,bus=ahci.0
 
-runusbm:
-	qemu-system-i386 -m 128 -vga std -serial stdio -drive id=usbdrive,if=none,file=disk.hdd -device piix3-usb-uhci,id=usbbus -device usb-storage,drive=usbdrive
+runusb:
+	qemu-system-i386 -m 128 -vga std -serial stdio -usbdevice disk:disk.hdd -usbdevice mouse
 
 clean:
 	if [ -d "out/xfs" ]; then rm out/xfs/*; rmdir out/xfs; fi

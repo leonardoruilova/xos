@@ -88,6 +88,8 @@ mouse_packet:
 	.y			db 0
 mouse_irq_state			db 0
 
+ps2_present			db 0	; acpi determines this field using fadt
+
 ; wait_ps2_write:
 ; Waits to write to the PS/2 controller
 
@@ -161,11 +163,16 @@ ps2_reset:
 ; Initializes the PS/2 controller & devices
 
 ps2_init:
+	cmp [ps2_present], 0
+	je .finish
+
 	mov esi, .msg
 	call kprint
 
 	call ps2_kbd_init
 	call ps2_mouse_init
+
+.finish:
 	ret
 
 .msg				db "Initializing PS/2 controller...",10,0
@@ -180,10 +187,33 @@ ps2_kbd_init:
 
 	mov [kbd_status], 0
 
-	; reset
+.reset_again:
 	mov al, PS2_KBD_RESET
 	call ps2_send
 
+	cmp al, 0xFF
+	je .no_kbd
+
+	cmp al, 0xFC
+	je .no_kbd
+
+	cmp al, 0xFD
+	je .no_kbd
+
+	cmp al, 0xFE
+	je .reset_again
+
+	mov ecx, 3
+
+.wait_for_success:
+	call wait_ps2_read
+	in al, 0x60
+	cmp al, 0xAA
+	je .continue
+
+	jmp .wait_for_success
+
+.continue:
 	; autorepeat rate
 	mov al, PS2_KBD_SET_AUTOREPEAT
 	call ps2_send
@@ -211,6 +241,13 @@ ps2_kbd_init:
 	mov al, 1
 	call irq_unmask
 	ret
+
+.no_kbd:
+	mov esi, .no_kbd_msg
+	call kprint
+	ret
+
+.no_kbd_msg			db "ps2: keyboard not present.",10,0
 
 ; ps2_kbd_set_leds:
 ; Sets the LEDs of the PS/2 keyboard
@@ -395,7 +432,7 @@ ps2_mouse_init:
 	mov al, PS2_MOUSE_RESET
 	call ps2_mouse_send
 
-	mov ecx, 16
+	mov ecx, 3
 
 .loop:
 	cmp al, 0
@@ -405,6 +442,9 @@ ps2_mouse_init:
 	je .no_mouse
 
 	cmp al, 0xFC
+	je .no_mouse
+
+	cmp al, 0xFD
 	je .no_mouse
 
 	cmp al, 0xAA
@@ -503,25 +543,6 @@ ps2_mouse_init:
 	call iowait
 	call iowait
 
-	; decode the mouse cursor
-	mov ecx, 64*64*4
-	call kmalloc
-	mov [mouse_cursor], eax
-
-	mov edx, cursor
-	mov ebx, [mouse_cursor]
-	call decode_bmp
-	mov [mouse_width], esi
-	mov [mouse_height], edi
-
-	mov eax, [screen.width]
-	sub eax, [mouse_width]
-	mov [mouse_x_max], eax
-
-	mov eax, [screen.height]
-	sub eax, [mouse_height]
-	mov [mouse_y_max], eax
-
 	; unmask the mouse irq
 	mov al, 12
 	call irq_unmask
@@ -534,10 +555,12 @@ ps2_mouse_init:
 
 .no_mouse:
 	mov esi, .no_mouse_msg
-	jmp early_boot_error
+	call kprint
 
-.no_mouse_msg			db "Mouse not present.",0
-.100_msg			db "Mouse doesn't support 200 packets/sec, using default...",10,0
+	ret
+
+.no_mouse_msg			db "ps2: mouse not present.",10,0
+.100_msg			db "ps2: mouse doesn't support 200 packets/sec, using default...",10,0
 
 ; ps2_mouse_irq:
 ; PS/2 Mouse IRQ Handler

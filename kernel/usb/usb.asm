@@ -90,28 +90,6 @@ usb_init:
 	call vmm_alloc
 	mov [usb_setup_packet], eax
 
-	mov eax, KERNEL_HEAP
-	mov ecx, 1
-	mov dl, PAGE_PRESENT or PAGE_WRITEABLE or PAGE_NO_CACHE
-	call vmm_alloc
-	mov [usb_device_descriptor], eax
-
-	; ---
-	; JUST TESTING
-	; ---
-	;mov eax, 0
-	;mov bl, 1
-	;mov cx, 0x0100
-	;mov dx, 0
-	;mov si, 18
-	;mov edi, usb_device_descriptor
-	;call usb_get_descriptor
-
-	;mov edi, usb_device_descriptor
-	;mov eax, [edi]
-	;call int_to_string
-	;call kprint
-
 	ret
 
 .msg				db "usb: detecting USB controllers...",10,0

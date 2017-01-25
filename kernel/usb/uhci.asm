@@ -356,6 +356,45 @@ uhci_control:
 	and dx, 0xFFFC
 	mov [.io], dx		; uhci io base
 
+	; if using port 1, disable port 2
+	; if using port 2, vice versa
+	cmp [.port], 1
+	je .use_port1
+
+.use_port2:
+	mov dx, [.io]
+	add dx, UHCI_REGISTER_PORT1
+	in ax, dx
+	and ax, not UHCI_PORT_ENABLE
+	out dx, ax
+
+	mov dx, [.io]
+	add dx, UHCI_REGISTER_PORT2
+	in ax, dx
+	or ax, UHCI_PORT_ENABLE
+	out dx, ax
+
+	mov eax, 5
+	call pit_sleep
+	jmp .start
+
+.use_port1:
+	mov dx, [.io]
+	add dx, UHCI_REGISTER_PORT2
+	in ax, dx
+	and ax, not UHCI_PORT_ENABLE
+	out dx, ax
+
+	mov dx, [.io]
+	add dx, UHCI_REGISTER_PORT1
+	in ax, dx
+	or ax, UHCI_PORT_ENABLE
+	out dx, ax
+
+	mov eax, 5
+	call pit_sleep
+
+.start:
 	; create the frame list
 	mov edi, [uhci_frame_list]
 	mov eax, [uhci_td_physical]
@@ -458,15 +497,33 @@ uhci_control:
 	stosd
 	stosd
 
-	jmp .start
+	jmp .send_packet
 
 .no_data:
+	; construct second TD as a status packet
 	mov edi, [uhci_td]
-	add edi, 32
+	add edi, 64
 	mov eax, 0x00000001	; invalid entry
 	stosd
 
-.start:
+	mov eax, (1 shl 26) or (11b shl 27) or (1 shl 23) or (1 shl 24)
+	stosd
+	mov eax, 0x7FF
+	shl eax, 21
+	or eax, UHCI_PACKET_IN	; when there is no data stage, status comes from device to host
+	stosd
+
+	mov eax, 0	; buffer..
+	stosd
+
+	mov eax, 0
+	stosd
+	stosd
+	stosd
+	stosd
+
+.send_packet:
+	wbinvd
 	wbinvd
 
 	; tell the uhci where the frame list is
