@@ -12,6 +12,6 @@ It is divided into subdirectories that are sorted out logically:
   keymaps/    Contains scancode and ASCII character mapping tables.
   mm/         Contains the low-level memory manager.
   tasking/    Contains the scheduler, system calls and other multitasking things.
-  usb/        Contains USB controller drivers.
+  usb/        Contains USB host and device drivers.
   x86/        Contains things specific to x86, such as PIC, APIC, CPU modes, etc...
   misc/       Contains things that don't fit into any category from the above.

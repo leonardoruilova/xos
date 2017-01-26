@@ -7,7 +7,7 @@ org 0x1000
 
 	jmp 0x0000:kmain16
 
-	kernel_version			db "xOS32 v0.07 (20 January 2017)",0
+	kernel_version			db "xOS32 v0.07 (26 January 2017)",0
 	copyright_str			db "Copyright (C) 2016-2017 by Omar Mohammad, all rights reserved.",0
 	newline				db 10,0
 
@@ -265,7 +265,6 @@ kmain32:
 	call ps2_init
 	call wm_init
 	call use_back_buffer
-
 	call unlock_screen
 
 	mov esi, test_task
@@ -364,6 +363,9 @@ idle_process:
 	;include "kernel/usb/ohci.asm"		; USB 1.0 (OHCI)
 	;include "kernel/usb/ehci.asm"		; USB 2.0 (EHCI)
 	;include "kernel/usb/xhci.asm"		; USB 3.0 (xHCI)
+	include "kernel/usb/usbmsd.asm"		; USB Mass Storage Device Driver
+	;include "kernel/usb/usbhid.asm"	; USB Human Interface Device Driver
+	;include "kernel/usb/usbcam.asm"	; USB Camera Device Driver
 
 	; Boot splash
 	boot_splash:

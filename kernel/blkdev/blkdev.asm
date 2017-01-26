@@ -31,6 +31,7 @@ BLKDEV_ATA			= 1
 BLKDEV_AHCI			= 2
 BLKDEV_RAMDISK			= 3
 BLKDEV_MEMDISK			= 4
+BLKDEV_USBMSD			= 5
 
 ; Device Content
 BLKDEV_FLAT			= 0
@@ -57,7 +58,7 @@ blkdev_init:
 	call memdisk_detect
 	call ata_detect
 	call ahci_detect
-	;call usb_mass_detect
+	;call usbmsd_detect
 
 	; determine the boot device
 	; allocate a temporary buffer 512 bytes to read the MBR of each device present

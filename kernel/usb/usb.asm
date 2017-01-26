@@ -301,7 +301,6 @@ usb_get_descriptor:
 .buffer			dd 0
 
 ; USB Device Descriptor
-align 16
 usb_device_descriptor:
 	.length			db 0	; 0x12
 	.type			db 0	; USB_DESCRIPTOR_DEVICE
@@ -318,6 +317,28 @@ usb_device_descriptor:
 	.serial_number		db 0
 	.configurations		db 0
 
+; USB Configuration Descriptor
+usb_configuration_descriptor:
+	.length			db 0	; 0x09
+	.type			db 0	; USB_DESCRIPTOR_CONFIGURATION
+	.total_length		dw 0
+	.interface_count	db 0
+	.configuration_id	db 0
+	.configuration_string	db 0
+	.attributes		db 0
+	.max_power		db 0
+
+; USB Interface Descriptor
+usb_interface_descriptor:
+	.length			db 0	; 0x09
+	.type			db 0	; USB_DESCRIPTOR_INTERFACE
+	.interface_number	db 0
+	.alternate_setting	db 0
+	.endpoints		db 0
+	.class			db 0
+	.subclass		db 0
+	.protocol		db 0
+	.index			db 0
 
 
 

@@ -361,6 +361,11 @@ uhci_control:
 	cmp [.port], 1
 	je .use_port1
 
+	cmp [.port], 2
+	je .use_port2
+
+	jmp .no_port
+
 .use_port2:
 	mov dx, [.io]
 	add dx, UHCI_REGISTER_PORT1
@@ -376,6 +381,19 @@ uhci_control:
 
 	mov eax, 5
 	call pit_sleep
+
+	mov dx, [.io]
+	add dx, UHCI_REGISTER_PORT2
+	in ax, dx
+	test ax, UHCI_PORT_CONNECT
+	jz .no_device
+
+	test ax, UHCI_PORT_DEVICE_SPEED
+	jnz .low_speed
+
+	mov [.speed], 0
+	mov esi, .high_speed_msg
+	call kprint
 	jmp .start
 
 .use_port1:
@@ -393,6 +411,26 @@ uhci_control:
 
 	mov eax, 5
 	call pit_sleep
+
+	mov dx, [.io]
+	add dx, UHCI_REGISTER_PORT1
+	in ax, dx
+	test ax, UHCI_PORT_CONNECT
+	jz .no_device
+
+	test ax, UHCI_PORT_DEVICE_SPEED
+	jnz .low_speed
+
+	mov [.speed], 0
+	mov esi, .high_speed_msg
+	call kprint
+	jmp .start
+
+.low_speed:
+	mov [.speed], 1 shl 26
+
+	mov esi, .low_speed_msg
+	call kprint
 
 .start:
 	; create the frame list
@@ -422,7 +460,8 @@ uhci_control:
 	mov eax, [uhci_td_physical]
 	add eax, 64		; second TD
 	stosd
-	mov eax, (1 shl 26) or (11b shl 27) or (1 shl 23)	; low speed, 3 error limit, active
+	mov eax, (3 shl 27) or (1 shl 23)	; 3 error limit, active
+	or eax, [.speed]
 	stosd
 	mov eax, 7
 	shl eax, 21
@@ -451,7 +490,8 @@ uhci_control:
 	mov eax, [uhci_td_physical]
 	add eax, 64+32		; third TD
 	stosd
-	mov eax, (1 shl 26) or (11b shl 27) or (1 shl 23)	; low speed, 3 error limit, active
+	mov eax, (3 shl 27) or (1 shl 23)	; 3 error limit, active
+	or eax, [.speed]
 	stosd
 	mov esi, [usb_setup_packet]
 	movzx eax, word[esi+USB_SETUP_LENGTH]
@@ -480,8 +520,10 @@ uhci_control:
 	add edi, 64+32
 	mov eax, 0x00000001	; invalid entry
 	stosd
-	mov eax, (1 shl 26) or (11b shl 27) or (1 shl 23) or (1 shl 24)
+	mov eax, (3 shl 27) or (1 shl 23) or (1 shl 24)
+	or eax, [.speed]
 	stosd
+
 	mov eax, 0x7FF
 	shl eax, 21
 	or eax, UHCI_PACKET_OUT
@@ -506,7 +548,8 @@ uhci_control:
 	mov eax, 0x00000001	; invalid entry
 	stosd
 
-	mov eax, (1 shl 26) or (11b shl 27) or (1 shl 23) or (1 shl 24)
+	mov eax, (3 shl 27) or (1 shl 23) or (1 shl 24)
+	or eax, [.speed]
 	stosd
 	mov eax, 0x7FF
 	shl eax, 21
@@ -524,7 +567,6 @@ uhci_control:
 
 .send_packet:
 	wbinvd
-	wbinvd
 
 	; tell the uhci where the frame list is
 	mov dx, [.io]
@@ -537,7 +579,6 @@ uhci_control:
 	mov ax, 0
 	out dx, ax
 
-	call iowait
 	call iowait
 
 	mov dx, [.io]
@@ -578,9 +619,6 @@ uhci_control:
 	add dx, UHCI_REGISTER_STATUS
 	mov ax, 0x3F	; clear status
 	out dx, ax
-
-	mov esi, .finish_msg
-	call kprint
 
 	mov eax, 0
 	ret
@@ -636,13 +674,41 @@ uhci_control:
 	mov eax, -1
 	ret
 
+.no_port:
+	mov esi, .no_port_msg
+	call kprint
+	movzx eax, [.port]
+	call int_to_string
+	call kprint
+	mov esi, .no_port_msg2
+	call kprint
+
+	mov eax, -1
+	ret
+
+.no_device:
+	mov esi, .no_device_msg
+	call kprint
+	movzx eax, [.port]
+	call int_to_string
+	call kprint
+	mov esi, newline
+	call kprint
+
+	mov eax, -1
+	ret
+
+.speed			dd 0
 .port			db 0
 .buffer			dd 0
 .io			dw 0	; io port
-.finish_msg		db "usb-uhci: sent control packet successfully...",10,0
 .process_error_msg	db "usb-uhci: process error in control packet.",10,0
 .pci_error_msg		db "usb-uhci: PCI error in control packet.",10,0
 .interrupt_error_msg	db "usb-uhci: interrupt error in control packet.",10,0
-
+.no_port_msg		db "usb-uhci: port ",0
+.no_port_msg2		db " doesn't exist.",10,0
+.no_device_msg		db "usb-uhci: no device on port ",0
+.low_speed_msg		db "usb-uhci: control packet to low speed device.",10,0
+.high_speed_msg		db "usb-uhci: control packet to high speed device.",10,0
 
 
