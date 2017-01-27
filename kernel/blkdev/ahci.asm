@@ -39,9 +39,20 @@ AHCI_PORT_FIS_CONTROL		= 0x0040
 AHCI_PORT_RESERVED1		= 0x0044
 AHCI_PORT_VENDOR_SPECIFIC	= 0x0070
 
+; AHCI Port Command And Status
+AHCI_COMMAND_START		= 0x00000001
+AHCI_COMMAND_FIS_RECEIVE	= 0x00000010
+AHCI_COMMAND_DMA_RUNNING	= 0x00008000
+
 ; FIS Types
 AHCI_FIS_H2D			= 0x27
 AHCI_FIS_D2H			= 0x34
+AHCI_FIS_DMA_ACT		= 0x39
+AHCI_FIS_DMA_SETUP		= 0x41
+AHCI_FIS_DATA			= 0x46
+AHCI_FIS_BIST			= 0x58
+AHCI_FIS_PIO_SETUP		= 0x5F
+AHCI_FIS_DEV_BITS		= 0xA1
 
 ; Command Set
 SATA_IDENTIFY			= 0xEC
@@ -123,6 +134,11 @@ ahci_detect:
 	mov bh, PCI_STATUS_COMMAND
 	call pci_write_dword
 
+	; handoff is needed on some hardware
+	; if it fails, ignore this ahci controller
+	call ahci_handoff
+	jc .finish
+
 	mov [.port], 0
 
 .loop:
@@ -175,6 +191,137 @@ ahci_enable_cache:
 	mov cr0, eax
 	ret
 
+; ahci_handoff:
+; Takes ownership of the AHCI from the BIOS
+; In\	Nothing
+; Out\	EFLAGS.CF = 0 on success
+
+ahci_handoff:
+	call ahci_disable_cache
+
+	; does the controller support handoff?
+	mov edi, [ahci_abar]
+	test dword[edi+AHCI_ABAR_HOST_CAP], 1
+	jz .no_handoff
+
+	; take ownership from the BIOS
+	or dword[edi+AHCI_ABAR_HANDOFF], 2
+
+	mov ecx, TIMER_FREQUENCY*2	; time limit is 2 seconds -- much more than enough
+					; but God knows what kind of weird and buggy HW exist...
+
+.loop:
+	dec ecx
+	cmp ecx, 0
+	je .not_respond
+
+	sti
+	hlt
+	test dword[edi+AHCI_ABAR_HANDOFF], 1
+	jnz .loop
+
+	test dword[edi+AHCI_ABAR_HANDOFF], 2
+	jz .loop
+
+.done:
+	mov esi, .done_msg
+	call kprint
+
+	call ahci_enable_cache
+	clc
+	ret
+
+.no_handoff:
+	mov esi, .no_handoff_msg
+	call kprint
+
+	call ahci_enable_cache
+	clc
+	ret
+
+.not_respond:
+	mov esi, .not_respond_msg
+	call kprint
+
+	call ahci_enable_cache
+	stc
+	ret
+
+.done_msg			db "ahci: handoff succeeded.",10,0
+.no_handoff_msg			db "ahci: controller doesn't support handoff.",10,0
+.not_respond_msg		db "ahci: BIOS is not responding to handoff request.",10,0
+
+; ahci_start:
+; Turns on AHCI command execution
+; In\	BL = Port number
+; Out\	Nothing
+
+ahci_start:
+	pusha
+
+	mov eax, cr0
+	mov [.tmp], eax
+
+	mov [.port], bl
+	call ahci_disable_cache
+
+	movzx edi, [.port]
+	shl edi, 7
+	add edi, AHCI_ABAR_PORT_CONTROL
+	add edi, [ahci_abar]
+
+.loop:
+	test dword[edi+AHCI_PORT_COMMAND], AHCI_COMMAND_DMA_RUNNING
+	jnz .loop
+
+	or dword[edi+AHCI_PORT_COMMAND], AHCI_COMMAND_START or AHCI_COMMAND_FIS_RECEIVE
+
+	mov eax, [.tmp]
+	mov cr0, eax
+	popa
+	ret
+
+.port				db 0
+.tmp				dd 0
+
+; ahci_stop:
+; Turns off AHCI command execution
+; In\	BL = Port
+; Out\	Nothing
+
+ahci_stop:
+	pusha
+
+	mov eax, cr0
+	mov [.tmp], eax
+
+	mov [.port], bl
+	call ahci_disable_cache
+
+	movzx edi, [.port]
+	shl edi, 7
+	add edi, AHCI_ABAR_PORT_CONTROL
+	add edi, [ahci_abar]
+
+	; disable DMA
+	and dword[edi+AHCI_PORT_COMMAND], not AHCI_COMMAND_START
+
+.wait:
+	test dword[edi+AHCI_PORT_COMMAND], AHCI_COMMAND_DMA_RUNNING
+	jnz .wait
+
+	; disable FIS receive
+	and dword[edi+AHCI_PORT_COMMAND], not AHCI_COMMAND_FIS_RECEIVE
+
+	mov eax, [.tmp]
+	mov cr0, eax
+
+	popa
+	ret
+
+.port				db 0
+.tmp				dd 0
+
 ; ahci_identify:
 ; Identifies an AHCI device
 ; In\	BL = Port Number
@@ -212,6 +359,17 @@ ahci_identify:
 	xor al, al
 	rep stosb
 
+	mov edi, ahci_received_fis
+	mov ecx, end_ahci_received_fis - ahci_received_fis
+	xor al, al
+	rep stosb
+
+	; make the received FIS
+	mov [ahci_dma_setup_fis.type], AHCI_FIS_DMA_SETUP
+	mov [ahci_pio_setup_fis.type], AHCI_FIS_PIO_SETUP
+	mov [ahci_d2h_fis.type], AHCI_FIS_D2H
+	mov [ahci_dev_bits_fis.type], AHCI_FIS_DEV_BITS
+
 	; make the command list
 	mov [ahci_command_list.cfis_length], (end_ahci_command_fis-ahci_command_fis+3) / 4
 	mov [ahci_command_list.prdt_length], 1
@@ -222,12 +380,16 @@ ahci_identify:
 	mov [ahci_command_fis.flags], 0x80
 	mov [ahci_command_fis.command], SATA_IDENTIFY	; 0xEC
 	;mov [ahci_command_fis.count], 1
+	;mov [ahci_command_fis.device], 0xA0
 
 	; the PRDT
 	mov dword[ahci_prdt.base], sata_identify_data
 	mov [ahci_prdt.count], 511
 
 	; send the command to the device
+	mov bl, [.port]
+	call ahci_stop
+
 	movzx edi, [.port]
 	shl edi, 7
 	add edi, AHCI_ABAR_PORT_CONTROL
@@ -236,19 +398,19 @@ ahci_identify:
 	mov eax, [edi+AHCI_PORT_IRQ_STATUS]
 	mov [edi+AHCI_PORT_IRQ_STATUS], eax
 
-	and dword[edi+AHCI_PORT_COMMAND], not 1
-	and dword[edi+AHCI_PORT_COMMAND_ISSUE], not 1
 	mov dword[edi+AHCI_PORT_COMMAND_LIST], ahci_command_list
 	mov dword[edi+AHCI_PORT_COMMAND_LIST+4], 0
+	mov dword[edi+AHCI_PORT_FIS], ahci_received_fis
+	mov dword[edi+AHCI_PORT_FIS+4], 0
+
+	mov bl, [.port]
+	call ahci_start
 
 .wait_bsy:
-	sti
-	hlt
 	test dword[edi+AHCI_PORT_TASK_FILE], 0x80
 	jnz .wait_bsy
 
 .send_command:
-	or dword[edi+AHCI_PORT_COMMAND], 1
 	or dword[edi+AHCI_PORT_COMMAND_ISSUE], 1
 
 .loop:
@@ -267,8 +429,8 @@ ahci_identify:
 
 .after_loop:
 	; turn off the command execution
-	and dword[edi+AHCI_PORT_COMMAND], not 1
-	and dword[edi+AHCI_PORT_COMMAND_ISSUE], not 1
+	mov bl, [.port]
+	call ahci_stop
 
 	;mov eax, [edi+AHCI_PORT_IRQ_STATUS]
 	;mov [edi+AHCI_PORT_IRQ_STATUS], eax
@@ -310,6 +472,9 @@ ahci_identify:
 	ret
 
 .error:
+	mov bl, [.port]
+	call ahci_stop
+
 	mov esi, .error_msg
 	call kprint
 
@@ -364,6 +529,17 @@ ahci_read:
 	xor al, al
 	rep stosb
 
+	mov edi, ahci_received_fis
+	mov ecx, end_ahci_received_fis - ahci_received_fis
+	xor al, al
+	rep stosb
+
+	; make the received FIS
+	mov [ahci_dma_setup_fis.type], AHCI_FIS_DMA_SETUP
+	mov [ahci_pio_setup_fis.type], AHCI_FIS_PIO_SETUP
+	mov [ahci_d2h_fis.type], AHCI_FIS_D2H
+	mov [ahci_dev_bits_fis.type], AHCI_FIS_DEV_BITS
+
 	; make the command list
 	mov [ahci_command_list.cfis_length], (end_ahci_command_fis-ahci_command_fis+3) / 4
 	mov [ahci_command_list.prdt_length], 1
@@ -415,6 +591,9 @@ ahci_read:
 	mov [ahci_prdt.count], eax
 
 	; send the command to the device
+	mov bl, [.port]
+	call ahci_stop
+
 	call ahci_disable_cache
 	movzx edi, [.port]
 	shl edi, 7
@@ -424,10 +603,13 @@ ahci_read:
 	mov eax, [edi+AHCI_PORT_IRQ_STATUS]
 	mov [edi+AHCI_PORT_IRQ_STATUS], eax
 
-	and dword[edi+AHCI_PORT_COMMAND], not 1
-	and dword[edi+AHCI_PORT_COMMAND_ISSUE], not 1
 	mov dword[edi+AHCI_PORT_COMMAND_LIST], ahci_command_list
 	mov dword[edi+AHCI_PORT_COMMAND_LIST+4], 0
+	mov dword[edi+AHCI_PORT_FIS], ahci_received_fis
+	mov dword[edi+AHCI_PORT_FIS+4], 0
+
+	mov bl, [.port]
+	call ahci_start
 
 .wait_bsy:
 	test dword[edi+AHCI_PORT_TASK_FILE], 0x80
@@ -453,8 +635,8 @@ ahci_read:
 
 .after_loop:
 	; turn off the command execution
-	and dword[edi+AHCI_PORT_COMMAND], not 1
-	and dword[edi+AHCI_PORT_COMMAND_ISSUE], not 1
+	mov bl, [.port]
+	call ahci_stop
 
 	;mov eax, [edi+AHCI_PORT_IRQ_STATUS]
 	;mov [edi+AHCI_PORT_IRQ_STATUS], eax
@@ -493,6 +675,9 @@ ahci_read:
 
 	mov ebx, [edi+AHCI_PORT_TASK_FILE]
 	mov [.task_file], bl
+
+	mov bl, [.port]
+	call ahci_stop
 
 	call ahci_enable_cache
 
@@ -596,6 +781,33 @@ ahci_prdt:
 	.count			dd 0
 
 end_ahci_command_table:
+
+; ahci_received_fis:
+; Names says it all
+align 4096
+ahci_received_fis:
+
+ahci_dma_setup_fis:
+	.type			db AHCI_FIS_DMA_SETUP
+
+	times 0x20 - ($-ahci_received_fis) db 0
+
+ahci_pio_setup_fis:
+	.type			db AHCI_FIS_PIO_SETUP
+
+	times 0x40 - ($-ahci_received_fis) db 0
+
+ahci_d2h_fis:
+	.type			db AHCI_FIS_D2H
+
+	times 0x58 - ($-ahci_received_fis) db 0
+
+ahci_dev_bits_fis:
+	.type			db AHCI_FIS_DEV_BITS
+
+	times 0x100 - ($-ahci_received_fis) db 0
+
+end_ahci_received_fis:
 
 ; sata_identify_data:
 ; Data returned from the SATA/SATAPI IDENTIFY command
