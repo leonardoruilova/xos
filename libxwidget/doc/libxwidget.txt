@@ -68,6 +68,18 @@ Return value:
 	*	*	*
 	*	*	*
 
+* xwidget_window_set_color:
+Description: This function sets the background color of a window.
+Parameters:
+	EAX	=	Window handle (libxwidget handle, not the kernel.)
+	EBX	=	Color to use as background.
+
+Return value:
+	None.
+
+	*	*	*
+	*	*	*
+
 * xwidget_redraw:
 Description: This function refreshes all components of the window.
 Parameters:
@@ -105,6 +117,25 @@ Return value:
 	*	*	*
 	*	*	*
 
+* xwidget_create_gbutton:
+Description: This function creates a button like the above, but gives more configuration options, and allows the application to set the color and the width/height of the button.
+Parameters:
+	EAX	=	Window handle to create the button in (libxwidget handle, not the kernel.)
+	CX	=	X position.
+	DX	=	Y position.
+	BX	=	Width.
+	DI	=	Height.
+	ESI	=	Pointer to text of button.
+	EBP	=	Pointer to button color (see note.)
+
+Return value:
+	EAX	=	Component handle of the button, -1 on error.
+
+Note: The button color is two DWORDs. The low DWORD is the foreground color, and the high DWORD is the background color.
+
+	*	*	*
+	*	*	*
+
 * xwidget_create_label:
 Description: This function creates static text.
 Parameters:
@@ -128,5 +159,6 @@ Parameters:
 
 Return value:
 	None.
+
 
 
