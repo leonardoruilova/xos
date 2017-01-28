@@ -160,11 +160,21 @@ xwidget_redraw:
 
 	mov edi, [.tmp]
 	mov esi, [edi+GBUTTON_TEXT]
+	call xwidget_strlen
+
+	shl eax, 2	; mul 8/2
+	mov cx, [edi+GBUTTON_WIDTH]
+	shr cx, 1
+	;shr ax, 1
+	sub cx, ax
+	add cx, [edi+GBUTTON_X]
+
+	mov dx, [edi+GBUTTON_HEIGHT]
+	shr dx, 1
+	sub dx, 8
+	add dx, [edi+GBUTTON_Y]
+
 	mov ebx, [edi+GBUTTON_FG]
-	mov cx, [edi+GBUTTON_X]
-	mov dx, [edi+GBUTTON_Y]
-	add cx, 8
-	add dx, 8
 	mov eax, [.handle]
 	mov ebp, XOS_WM_DRAW_TEXT
 	int 0x60
