@@ -786,6 +786,12 @@ input_number:
 	stc
 	ret
 
+; xwidget_yield_handler:
+; This is called by xwidget every time it is idle
+
+xwidget_yield_handler:
+	ret
+
 	; Data...
 	window_text		db "Calculator",0
 	text0			db "0",0

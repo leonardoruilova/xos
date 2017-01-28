@@ -34,6 +34,9 @@ main:
 	mov ebx, 0		; color
 	int 0x60		; call kernel
 
+	mov ebp, 3		; redraw screen
+	int 0x60		; call kernel
+
 .hang:
 	mov ebp, 4		; read event
 	mov eax, [window_handle]

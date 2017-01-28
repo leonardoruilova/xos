@@ -90,8 +90,22 @@ shell:
 .filename			db "shell   exe"		; 0
 .reserved1			db 0				; 11
 .lba_sector			dd 4020				; 12
-.size_sectors			dd 10				; 16
-.size_bytes			dd 512*10			; 20
+.size_sectors			dd 20				; 16
+.size_bytes			dd 512*20			; 20
+.time				db 0
+				db 0
+.date				db 5
+				db 1
+				dw 2016
+.reserved2			dw 0
+
+shellcfg:
+
+.filename			db "shell   cfg"		; 0
+.reserved1			db 0				; 11
+.lba_sector			dd 4040				; 12
+.size_sectors			dd 1				; 16
+.size_bytes			dd 512*1			; 20
 .time				db 0
 				db 0
 .date				db 5

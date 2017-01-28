@@ -616,7 +616,6 @@ ahci_read:
 	jnz .wait_bsy
 
 .send_command:
-	or dword[edi+AHCI_PORT_COMMAND], 1
 	or dword[edi+AHCI_PORT_COMMAND_ISSUE], 1
 
 .loop:

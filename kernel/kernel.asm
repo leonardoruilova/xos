@@ -267,24 +267,12 @@ kmain32:
 	call use_back_buffer
 	call unlock_screen
 
-	mov esi, test_task
+	mov esi, main_task
 	call create_task
 
-	mov esi, test_task2
-	call create_task
+	jmp idle_process
 
-	mov esi, test_task3
-	call create_task
-
-	mov esi, test_task4
-	call create_task
-
-	call yield
-
-test_task		db "hello.exe",0
-test_task2		db "draw.exe",0
-test_task3		db "button.exe",0
-test_task4		db "calc.exe",0
+main_task		db "shell.exe",0
 boot_splash_buffer	dd 0
 
 ; idle_process:
@@ -315,11 +303,13 @@ idle_process:
 	include "kernel/firmware/vbe.asm"	; VBE 2.0 driver
 	include "kernel/firmware/pit.asm"	; PIT driver
 	include "kernel/firmware/pci.asm"	; PCI driver
+	include "kernel/firmware/cmos.asm"	; CMOS RTC driver
 
 	; ACPI
 	include "kernel/acpi/tables.asm"	; ACPI table functions
 	include "kernel/acpi/aml.asm"		; ACPI AML functions
 	include "kernel/acpi/sleep.asm"		; ACPI sleeping code
+	include "kernel/acpi/public.asm"	; "Public" ACPI functions
 
 	; Miscellaneous Stuff
 	include "kernel/misc/kprint.asm"	; debugging stuff
@@ -379,9 +369,8 @@ idle_process:
 
 	; Default bitmap font
 	font:
-	;file "kernel/fonts/courier.bin"
-	;file "kernel/fonts/term.bin"
-	file "kernel/fonts/alotware.bin"
+	file "kernel/fonts/term.bin"
+	;file "kernel/fonts/alotware.bin"
 	;file "kernel/fonts/cp437.bin"
 	;include "kernel/fonts/glaux-mono.asm"
 

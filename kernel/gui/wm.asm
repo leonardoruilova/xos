@@ -53,12 +53,15 @@ WM_LEFT_CLICK			= 0x0001
 WM_RIGHT_CLICK			= 0x0002
 WM_KEYPRESS			= 0x0004
 WM_CLOSE			= 0x0008
+WM_GOT_FOCUS			= 0x0010
+WM_LOST_FOCUS			= 0x0020
 
 MAXIMUM_WINDOWS			= 32
 
 align 4
 open_windows			dd 0
 active_window			dd -1
+old_active_window		dd -1
 window_handles			dd 0
 wm_background			dd 0
 wm_running			db 0
@@ -76,7 +79,7 @@ window_active_border		dd 0x383838
 window_active_outline		dd 0x00A2E8
 window_close_color		dd 0xD80000
 window_background		dd 0xD0D0D0
-window_opacity			db 0		; valid values are 0 to 4, 0 = opaque, 1 = less transparent, 4 = most transparent.
+window_opacity			db 1		; valid values are 0 to 4, 0 = opaque, 1 = less transparent, 4 = most transparent.
 
 align 4
 window_border_x_min		dw 0		; min x pos for a 0 width window
@@ -933,14 +936,39 @@ wm_mouse_event:
 	jmp .done
 
 .set_focus:
+	mov eax, [active_window]
+	mov [old_active_window], eax
+
 	call wm_detect_window
 	mov [active_window], eax
 
 	cmp eax, -1
-	je .done
+	je .no_focus
+
+	shl eax, 7
+	add eax, [window_handles]
+	or word[eax+WINDOW_EVENT], WM_GOT_FOCUS
+
+	cmp [old_active_window], -1
+	je .click
+
+	mov eax, [old_active_window]
+	shl eax, 7
+	add eax, [window_handles]
+	or word[eax+WINDOW_EVENT], WM_LOST_FOCUS
 
 	;jmp .done
 	jmp .click
+
+.no_focus:
+	cmp [old_active_window], -1
+	je .done
+
+	mov eax, [old_active_window]
+	shl eax, 7
+	add eax, [window_handles]
+	or word[eax+WINDOW_EVENT], WM_LOST_FOCUS
+	jmp .done
 
 .drag:
 	;mov [wm_dirty], 1

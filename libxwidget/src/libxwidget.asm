@@ -20,6 +20,8 @@ use32
 	WM_RIGHT_CLICK		= 0x0002
 	WM_KEYPRESS		= 0x0004
 	WM_CLOSE		= 0x0008
+	WM_GOT_FOCUS		= 0x0010
+	WM_LOST_FOCUS		= 0x0020
 
 	; Window Flags
 	WM_NO_FRAME		= 0x0002
@@ -27,6 +29,7 @@ use32
 
 	XWIDGET_BUTTON		= 0x0001	; button click event
 	XWIDGET_CLOSE		= 0x0002	; close event
+	XWIDGET_LOST_FOCUS	= 0x0004
 
 	xwidget_version		db "libxwidget 1",0
 
@@ -36,6 +39,7 @@ use32
 	include			"libxwidget/src/button.asm"	; button component
 	include			"libxwidget/src/label.asm"	; label component
 	include			"libxwidget/src/textbox.asm"	; textbox component
+	include			"libxwidget/src/gbutton.asm"	; gbutton component
 
 	; typedef struct window_data_t
 	; {
@@ -112,6 +116,12 @@ xwidget_create_window:
 	pop edi
 
 	mov [edi+4], eax	; store the window components array
+	mov [.component], eax
+
+	mov edi, [.component]
+	mov byte[edi], XWIDGET_WINDOW
+	mov eax, [xwidget_window_color]
+	mov dword[edi+1], eax
 
 	inc [xwidget_windows_count]
 	pop ebx			; return the window handle
@@ -124,6 +134,42 @@ xwidget_create_window:
 	mov eax, -1
 	mov ebx, eax
 	ret
+
+.component		dd 0
+
+; xwidget_kill_window:
+; Kills a window
+; In\	EAX = Window handle
+; Out\	Nothing
+align 4
+xwidget_kill_window:
+	cmp eax, XWIDGET_MAX_WINDOWS
+	jge .done
+
+	mov edi, eax
+	shl edi, 3
+	add edi, xwidget_windows_data
+	mov ebx, [edi]		; window handle
+	mov [.handle], ebx
+
+	mov eax, [edi+4]	; components array
+
+	mov dword[edi], 0
+	mov dword[edi+4], 0
+
+	mov ebp, XOS_FREE
+	int 0x60		; free the memory
+
+	mov eax, [.handle]
+	mov ebp, XOS_WM_KILL
+	int 0x60
+
+	dec [xwidget_windows_count]
+
+.done:
+	ret
+
+.handle				dd 0
 
 ; xwidget_strlen:
 ; Gets the length of a string
@@ -178,6 +224,9 @@ xwidget_wait_event:
 	test ax, WM_CLOSE
 	jnz .close
 
+	test ax, WM_LOST_FOCUS
+	jnz .lost_focus
+
 	test ax, WM_LEFT_CLICK
 	jnz .clicked
 
@@ -189,6 +238,7 @@ xwidget_wait_event:
 	jmp .check_event_loop
 
 .yield:
+	call xwidget_yield_handler
 	mov ebp, XOS_YIELD	; cooperative multitasking -- give control to next task
 	int 0x60
 	jmp .start		; when control comes back to us, continue waiting for event
@@ -230,6 +280,9 @@ xwidget_wait_event:
 	cmp byte[esi], XWIDGET_BUTTON
 	je .found_button
 
+	cmp byte[esi], XWIDGET_GBUTTON
+	je .found_gbutton
+
 	add esi, 256
 	jmp .loop
 
@@ -268,10 +321,37 @@ xwidget_wait_event:
 	mov ebx, [.tmp]
 	ret
 
+.found_gbutton:
+	mov [.tmp], esi
+
+	mov cx, [.x]	; mouse pos
+	mov dx, [.y]
+
+	cmp cx, [esi+GBUTTON_X]
+	jl .continue
+
+	cmp dx, [esi+GBUTTON_Y]
+	jl .continue
+
+	cmp cx, [esi+GBUTTON_END_X]
+	jg .continue
+
+	cmp dx, [esi+GBUTTON_END_Y]
+	jg .continue
+
+	mov eax, XWIDGET_BUTTON
+	mov ebx, [.tmp]
+	ret
+
 .continue:
 	mov esi, [.tmp]
 	add esi, 256
 	jmp .loop
+
+.lost_focus:
+	mov eax, XWIDGET_LOST_FOCUS
+	mov ebx, [.current_window]
+	ret
 
 align 4
 .current_window			dd 0

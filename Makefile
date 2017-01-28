@@ -21,7 +21,8 @@ all:
 	dd if=out/buttontest.exe conv=notrunc bs=512 seek=4002 of=disk.hdd
 	dd if=out/calc.exe conv=notrunc bs=512 seek=4010 of=disk.hdd
 	dd if=out/shell.exe conv=notrunc bs=512 seek=4020 of=disk.hdd
-	dd if=wp/wp4.bmp conv=notrunc bs=512 seek=1000 of=disk.hdd
+	dd if=wp/wp1.bmp conv=notrunc bs=512 seek=1000 of=disk.hdd
+	dd if=shell/shell.cfg conv=notrunc bs=512 seek=4040 of=disk.hdd
 	gcc -c xfs/src/main.c -o out/xfs/main.o
 	gcc -c xfs/src/xfs.c -o out/xfs/xfs.o
 	gcc out/xfs/*.o -o ./xfs/xfs

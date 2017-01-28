@@ -9,6 +9,32 @@ use32
 	XWIDGET_BUTTON		= 0x01
 	XWIDGET_LABEL		= 0x02
 	XWIDGET_TEXTBOX		= 0x03
+	XWIDGET_WINDOW		= 0x04
+	XWIDGET_GBUTTON		= 0x05
+
+; 
+; typedef struct window_component
+; {
+;	u8 id;		// XWIDGET_WINDOW
+;	u32 color;
+;	u8 reserved[251];
+; }
+;
+;
+
+; xwidget_window_set_color:
+; Sets the background color of a window
+; In\	EAX = Window handle
+; In\	EBX = Color
+; Out\	Nothing
+
+xwidget_window_set_color:
+	shl eax, 3
+	add eax, xwidget_windows_data
+	mov eax, [eax+4]	; components
+	mov [eax+1], ebx	; window color
+
+	ret
 
 ; xwidget_find_component:
 ; Finds a free component
@@ -63,7 +89,8 @@ xwidget_redraw:
 	; first clear the window
 	mov ebp, XOS_WM_CLEAR
 	mov eax, [.handle]
-	mov ebx, [xwidget_window_color]
+	mov edi, [.components]
+	mov ebx, [edi+1]
 	int 0x60
 
 	; now start going through the components
@@ -81,6 +108,9 @@ xwidget_redraw:
 
 	cmp byte[esi], XWIDGET_LABEL
 	je .draw_label
+
+	cmp byte[esi], XWIDGET_GBUTTON
+	je .draw_gbutton
 
 .skip:
 	add esi, 256
@@ -107,6 +137,33 @@ xwidget_redraw:
 	mov cx, [edi+5]
 	mov dx, [edi+7]
 	add cx, 16
+	add dx, 8
+	mov eax, [.handle]
+	mov ebp, XOS_WM_DRAW_TEXT
+	int 0x60
+
+	mov esi, [.tmp]
+	add esi, 256
+	jmp .loop
+
+.draw_gbutton:
+	mov [.tmp], esi
+	mov edi, esi
+
+	mov ax, [edi+GBUTTON_WIDTH]
+	mov bx, [edi+GBUTTON_HEIGHT]
+	mov cx, [edi+GBUTTON_X]
+	mov dx, [edi+GBUTTON_Y]
+	mov esi, [edi+GBUTTON_BG]
+	mov edi, [.handle]
+	call xwidget_fill_rect
+
+	mov edi, [.tmp]
+	mov esi, [edi+GBUTTON_TEXT]
+	mov ebx, [edi+GBUTTON_FG]
+	mov cx, [edi+GBUTTON_X]
+	mov dx, [edi+GBUTTON_Y]
+	add cx, 8
 	add dx, 8
 	mov eax, [.handle]
 	mov ebp, XOS_WM_DRAW_TEXT

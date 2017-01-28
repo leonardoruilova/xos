@@ -70,6 +70,12 @@ main:
 	mov ebp, 0x15		; terminate..
 	int 0x60
 
+; xwidget_yield_handler:
+; This is called by xwidget every time it is idle
+
+xwidget_yield_handler:
+	ret
+
 	; Data...
 	window_title			db "Button Demo",0
 	button_text			db "Click Me!",0

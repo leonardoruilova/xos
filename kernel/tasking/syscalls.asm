@@ -4,7 +4,7 @@
 
 use32
 
-MAXIMUM_FUNCTION		= 0x0015
+MAXIMUM_FUNCTION		= 0x0019
 
 ; Function Table ;)
 align 16
@@ -31,6 +31,10 @@ api_table:
 	dd get_screen_info	; 0x0013
 	dd ps2_kbd_read		; 0x0014
 	dd terminate		; 0x0015
+	dd create_task		; 0x0016
+	dd cmos_get_time	; 0x0017
+	dd shutdown		; 0x0018
+	dd reboot		; 0x0019
 
 ; syscall_init:
 ; Installs the kernel API interrupt vector
