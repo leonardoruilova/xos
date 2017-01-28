@@ -691,8 +691,27 @@ ahci_read:
 	mov al, [.task_file]
 	call hex_byte_to_string
 	call kprint
-	mov esi, newline
+	mov esi, .error_msg3
 	call kprint
+	mov al, [ahci_command_fis.command]
+	call hex_byte_to_string
+	call kprint
+	mov esi, .error_msg4
+	call kprint
+	mov edx, dword[.lba+4]
+	mov eax, dword[.lba]
+	call hex_qword_to_string
+	call kprint
+	mov esi, .error_msg5
+	call kprint
+	mov eax, [.count]
+	call hex_word_to_string
+	call kprint
+	mov esi,newline
+	call kprint
+
+	mov al, 1
+	mov ah, [.task_file]
 
 	ret
 
@@ -716,8 +735,11 @@ ahci_read:
 .buffer			dd 0
 .buffer_phys		dd 0
 .task_file		db 0
-.error_msg		db "ahci: hardware error on port ",0
+.error_msg		db "ahci: hardware error on SATA device, AHCI port ",0
 .error_msg2		db "; task file 0x",0
+.error_msg3		db "; command 0x",0
+.error_msg4		db "; LBA 0x",0
+.error_msg5		db "; count 0x",0
 .memory_error_msg	db "ahci: attempted to write to non-present page (0x",0
 .memory_error_msg2	db ")",10,0
 
