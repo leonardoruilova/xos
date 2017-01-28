@@ -204,18 +204,17 @@ update_time:
 	cmp [.hour], 0
 	je .midnight
 
-	cmp [.hour], 12
-	jge .pm
-
 	cmp [.hour], 9
 	jle .hour_small
+
+	cmp [.hour], 12
+	jg .pm
 
 .am:
 	movzx eax, [.hour]
 	call int_to_string
 	mov edi, time_text
 	movsw
-
 	mov word[time_text+6], "AM"
 	jmp .done
 
@@ -224,23 +223,40 @@ update_time:
 	mov word[time_text+6], "AM"
 	jmp .done
 
-.pm:
-	sub [.hour], 12
-	movzx eax, [.hour]
-	call int_to_string
-	mov edi, time_text
-	movsw
-
-	mov word[time_text+6], "PM"
-	jmp .done
-
 .hour_small:
 	movzx eax, [.hour]
 	add al, 48
 	mov byte[time_text], "0"
 	mov byte[time_text+1], al
-
 	mov word[time_text+6], "AM"
+	jmp .done
+
+.pm:
+	movzx eax, [.hour]
+	sub eax, 12
+	cmp eax, 0
+	je .12_pm
+
+	cmp eax, 9
+	jle .pm_small
+
+	call int_to_string
+	mov edi, time_text
+	movsw
+	mov word[time_text+6], "PM"
+	jmp .done
+
+.pm_small:
+	add al, 48
+	mov byte[time_text], "0"
+	mov byte[time_text+1], al
+	mov word[time_text+6], "PM"
+	jmp .done
+
+.12_pm:
+	mov word[time_text], "12"
+	mov word[time_text+6], "PM"
+	jmp .done
 
 .done:
 	mov eax, [window_handle]

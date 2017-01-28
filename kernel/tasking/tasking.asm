@@ -500,5 +500,27 @@ align 4
 .task				dd 0
 .window_handle			dd 0
 
+; kill_all:
+; Kills all running tasks
+
+kill_all:
+	mov [.current_task], 0
+
+.loop:
+	cmp [.current_task], MAXIMUM_TASKS
+	jge .done
+
+	mov eax, [.current_task]
+	call kill_task
+
+	inc [.current_task]
+	jmp .loop
+
+.done:
+	ret
+
+align 4
+.current_task			dd 0
+
 
 
