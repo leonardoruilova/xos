@@ -998,7 +998,8 @@ wm_mouse_event:
 
 	add dx, [window_border_y_min]
 	cmp cx, dx
-	jg .click
+	;jg .click
+	jg .done
 
 	mov ecx, [mouse_old_x]
 	mov edx, [mouse_old_y]
