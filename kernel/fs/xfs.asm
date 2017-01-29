@@ -22,7 +22,7 @@ FILE_RESERVED		= 0x14
 FILE_HANDLE_SIZE	= 0x20
 
 ; Max no. of files the kernel can handle
-MAXIMUM_FILE_HANDLES	= 32		; increase this in the future
+MAXIMUM_FILE_HANDLES	= 512		; increase this in the future
 
 ; File Flags
 FILE_PRESENT		= 0x00000001
@@ -164,6 +164,9 @@ xfs_open:
 ; Out\	Nothing
 
 xfs_close:
+	cmp eax, MAXIMUM_FILE_HANDLES
+	jge .quit
+
 	mov [.handle], eax
 
 	mov esi, .msg
@@ -183,6 +186,7 @@ xfs_close:
 	xor al, al
 	rep movsb
 
+.quit:
 	ret
 
 .handle			dd 0
@@ -196,6 +200,9 @@ xfs_close:
 ; Out\	EAX = 0 on success
 
 xfs_seek:
+	cmp eax, MAXIMUM_FILE_HANDLES
+	jge .error
+
 	mov [.base], ebx
 	mov [.dest], ecx
 
@@ -292,6 +299,9 @@ xfs_seek:
 ; Out\	EAX = Current position, -1 on error
 
 xfs_tell:
+	cmp eax, MAXIMUM_FILE_HANDLES
+	jge .error
+
 	shl eax, 5
 	add eax, [file_handles]
 	test dword[eax], FILE_PRESENT
@@ -312,6 +322,9 @@ xfs_tell:
 ; Out\	EAX = # of successful bytes read
 
 xfs_read:
+	cmp eax, MAXIMUM_FILE_HANDLES
+	jge .error
+
 	shl eax, 5
 	add eax, [file_handles]
 	mov [.handle], eax

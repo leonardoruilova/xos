@@ -448,6 +448,9 @@ terminate:
 ; Out\	Nothing
 
 kill_task:
+	cmp eax, MAXIMUM_TASKS
+	jge .finish
+
 	mov [.task], eax
 
 	; verify the task even exists

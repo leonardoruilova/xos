@@ -56,7 +56,7 @@ WM_CLOSE			= 0x0008
 WM_GOT_FOCUS			= 0x0010
 WM_LOST_FOCUS			= 0x0020
 
-MAXIMUM_WINDOWS			= 32
+MAXIMUM_WINDOWS			= 512
 
 align 4
 open_windows			dd 0
