@@ -579,6 +579,9 @@ do_multiply:
 	jmp main.wait
 
 do_divide:
+	cmp [num2], 0		; check for divide by zero
+	je .divide_error
+
 	mov eax, [num1]
 	mov ebx, [num2]
 	xor edx, edx
@@ -611,6 +614,22 @@ do_divide:
 	call xwidget_redraw
 
 	jmp main.wait
+
+.divide_error:
+	mov esi, divide_error_text
+	mov ecx, divide_error_text_size
+	mov edi, number_text
+	rep movsb
+
+	mov eax, [window_handle]
+	call xwidget_redraw
+
+.hang:
+	call xwidget_wait_event
+	cmp eax, XWIDGET_CLOSE
+	je main.close
+
+	jmp .hang
 
 ; count_digits:
 ; Counts the digits of a number
@@ -810,6 +829,8 @@ xwidget_yield_handler:
 	text_minus		db "-",0
 	text_mul		db "*",0
 	text_div		db "/",0
+	divide_error_text	db "Divide by zero.",0
+	divide_error_text_size	= $ - divide_error_text
 
 	active_number		db 0
 

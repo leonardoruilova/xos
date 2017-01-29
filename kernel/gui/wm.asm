@@ -281,7 +281,7 @@ wm_get_window:
 	mov bx, [eax+WINDOW_Y]
 	mov si, [eax+WINDOW_WIDTH]
 	mov di, [eax+WINDOW_HEIGHT]
-	mov dx, [eax]
+	mov dx, [eax+WINDOW_FLAGS]
 	mov ecx, [eax+WINDOW_FRAMEBUFFER]
 	mov ebp, eax
 	add ebp, WINDOW_TITLE
@@ -473,9 +473,7 @@ wm_detect_window:
 	je .no
 
 	mov [.handle], MAXIMUM_WINDOWS-1
-	jmp .loop
 
-align 32
 .loop:
 	cmp [.handle], -1
 	je .no
@@ -488,7 +486,18 @@ align 32
 	mov [.y], bx
 	add si, ax
 	add di, bx
-	add di, 24
+
+	test dx, WM_NO_FRAME
+	jnz .start
+
+	test dx, WM_TRANSPARENT
+	jnz .start
+
+.border:
+	add si, [window_border_x_min]
+	add di, [window_border_y_min]
+
+.start:
 	mov [.max_x], si
 	mov [.max_y], di
 
@@ -538,7 +547,18 @@ wm_is_mouse_on_window:
 	mov [.y], bx
 	add si, ax
 	add di, bx
-	add di, 24
+
+	test dx, WM_NO_FRAME
+	jnz .start
+
+	test dx, WM_TRANSPARENT
+	jnz .start
+
+.border:
+	add si, [window_border_x_min]
+	add di, [window_border_y_min]
+
+.start:
 	mov [.max_x], si
 	mov [.max_y], di
 
@@ -863,13 +883,29 @@ wm_mouse_event:
 
 	mov ecx, [mouse_y]
 	mov dx, [eax+WINDOW_Y]
-	add dx, [window_border_y_min]
+	;add dx, [window_border_y_min]
+	add dx, [window_canvas_y]
 
 	cmp cx, dx
 	jl .check_exit
 
+	mov dx, [eax+WINDOW_Y]
 	add dx, [eax+WINDOW_HEIGHT]
-	;add dx, [window_border_y_min]
+	add dx, [window_border_y_min]
+	cmp cx, dx
+	jg .done
+
+	; x pos too
+	mov ecx, [mouse_x]
+	mov dx, [eax+WINDOW_X]
+	add dx, [window_canvas_x]
+
+	cmp cx, dx
+	jl .done
+
+	mov dx, [eax+WINDOW_X]
+	add dx, [eax+WINDOW_WIDTH]
+	add dx, [window_border_x_min]
 	cmp cx, dx
 	jg .done
 
@@ -997,10 +1033,20 @@ wm_mouse_event:
 	cmp cx, dx
 	jl .done
 
-	add dx, [window_border_y_min]
+	add dx, [window_canvas_y]
 	cmp cx, dx
 	;jg .done
 	jg .drag_canvas
+
+	mov ecx, [mouse_x]
+	mov dx, [esi+WINDOW_X]
+	cmp cx, dx
+	jl .done
+
+	add dx, [window_border_x_min]
+	add dx, [esi+WINDOW_WIDTH]
+	cmp cx, dx
+	jg .done
 
 	mov ecx, [mouse_old_x]
 	mov edx, [mouse_old_y]
