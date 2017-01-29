@@ -55,6 +55,7 @@ WM_KEYPRESS			= 0x0004
 WM_CLOSE			= 0x0008
 WM_GOT_FOCUS			= 0x0010
 WM_LOST_FOCUS			= 0x0020
+WM_DRAG				= 0x0040
 
 MAXIMUM_WINDOWS			= 512
 
@@ -998,14 +999,13 @@ wm_mouse_event:
 
 	add dx, [window_border_y_min]
 	cmp cx, dx
-	;jg .click
-	jg .done
+	;jg .done
+	jg .drag_canvas
 
 	mov ecx, [mouse_old_x]
 	mov edx, [mouse_old_y]
 	mov eax, [mouse_x]
 	mov ebx, [mouse_y]
-	jmp .do_x
 
 .do_x:
 	sub ax, cx
@@ -1059,6 +1059,18 @@ wm_mouse_event:
 .y_zero:
 	mov word[esi+WINDOW_Y], 0
 	jmp .done
+
+.drag_canvas:
+	mov eax, [active_window]
+	cmp eax, -1
+	je .done
+
+	shl eax, 7
+	add eax, [window_handles]
+	test word[eax+WINDOW_FLAGS], WM_PRESENT
+	jz .done
+
+	or word[eax+WINDOW_EVENT], WM_DRAG
 
 .done:
 	call wm_redraw

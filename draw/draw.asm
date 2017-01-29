@@ -17,6 +17,7 @@ WM_LEFT_CLICK			= 0x0001
 WM_RIGHT_CLICK			= 0x0002
 WM_KEYPRESS			= 0x0004
 WM_CLOSE			= 0x0008
+WM_DRAG				= 0x0040
 
 main:
 	mov ebp, 0		; create the window
@@ -42,6 +43,9 @@ main:
 
 	test ax, WM_LEFT_CLICK
 	jnz .got_event		; if the user clicked the window, read the mouse status
+
+	test ax, WM_DRAG
+	jnz .got_event		; if the user dragged on the window, read the mouse status
 
 	mov ebp, 1
 	int 0x60
