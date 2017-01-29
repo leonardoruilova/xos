@@ -428,17 +428,24 @@ acpi_detect_sb:
 	mov eax, "_SB_"
 	call acpi_get_scope
 	cmp eax, -1
-	je .error
+	je .no_sb
 	mov [aml_system_bus], eax
+	mov [aml_system_bus_size], ecx
+
+	ret
+
+.no_sb:
+	mov esi, .no_sb_msg
+	call kprint
+
+	mov eax, [aml_code]
+	mov [aml_system_bus], eax
+	mov eax, [aml_code_size]
 	mov [aml_system_bus_size], eax
 
 	ret
 
-.error:
-	mov esi, .error_msg
-	jmp early_boot_error
-
-.error_msg		db "Failed to find the ACPI System Bus.",0
+.no_sb_msg		db "acpi: system bus not present; assuming entire AML is SB scope.",10,0
 
 ; acpi_get_package:
 ; Returns a pointer to a package
