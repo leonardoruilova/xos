@@ -1,6 +1,6 @@
 
 ;; xOS -- libxwidget 1
-;; Copyright (c) 2017 by Omar Mohammad, all rights reserved.
+;; Copyright (c) 2017 by Omar Mohammad.
 
 use32
 

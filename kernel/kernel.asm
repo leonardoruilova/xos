@@ -1,14 +1,14 @@
 
 ;; xOS32
-;; Copyright (C) 2016-2017 by Omar Mohammad, all rights reserved.
+;; Copyright (C) 2016-2017 by Omar Mohammad.
 
 use16
 org 0x1000
 
 	jmp 0x0000:kmain16
 
-	kernel_version			db "xOS32 v0.08 (29 January 2017)",0
-	copyright_str			db "Copyright (C) 2016-2017 by Omar Mohammad, all rights reserved.",0
+	kernel_version			db "xOS32 v0.08 (30 January 2017)",0
+	copyright_str			db "Copyright (C) 2016-2017 by Omar Mohammad.",0
 	newline				db 10,0
 
 	align 16

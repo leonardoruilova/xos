@@ -1,6 +1,6 @@
 
 ;; Calculator application for xOS
-;; Copyright (C) 2017 by Omar Mohammad, all rights reserved.
+;; Copyright (C) 2017 by Omar Mohammad.
 
 use32
 org 0x8000000		; programs are loaded to 128 MB, drivers to 2048 MB

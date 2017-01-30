@@ -1,6 +1,6 @@
 
 ;; xOS -- libxwidget 1
-;; Copyright (c) 2017 by Omar Mohammad, all rights reserved.
+;; Copyright (c) 2017 by Omar Mohammad.
 
 use32
 
@@ -119,7 +119,7 @@ xwidget_create_window:
 	mov [.component], eax
 
 	mov edi, [.component]
-	mov byte[edi], XWIDGET_WINDOW
+	mov byte[edi], XWIDGET_CPNT_WINDOW
 	mov eax, [xwidget_window_color]
 	mov dword[edi+1], eax
 
@@ -277,10 +277,10 @@ xwidget_wait_event:
 	cmp esi, [.components_end]
 	jge .start
 
-	cmp byte[esi], XWIDGET_BUTTON
+	cmp byte[esi], XWIDGET_CPNT_BUTTON
 	je .found_button
 
-	cmp byte[esi], XWIDGET_GBUTTON
+	cmp byte[esi], XWIDGET_CPNT_GBUTTON
 	je .found_gbutton
 
 	add esi, 256

@@ -1,21 +1,21 @@
 
 ;; xOS -- libxwidget 1
-;; Copyright (c) 2017 by Omar Mohammad, all rights reserved.
+;; Copyright (c) 2017 by Omar Mohammad.
 
 use32
 
 	; component IDs
-	XWIDGET_NONE		= 0x00
-	XWIDGET_BUTTON		= 0x01
-	XWIDGET_LABEL		= 0x02
-	XWIDGET_TEXTBOX		= 0x03
-	XWIDGET_WINDOW		= 0x04
-	XWIDGET_GBUTTON		= 0x05
+	XWIDGET_CPNT_NONE	= 0x00
+	XWIDGET_CPNT_BUTTON	= 0x01
+	XWIDGET_CPNT_LABEL	= 0x02
+	XWIDGET_CPNT_TEXTBOX	= 0x03
+	XWIDGET_CPNT_WINDOW	= 0x04
+	XWIDGET_CPNT_GBUTTON	= 0x05
 
 ; 
 ; typedef struct window_component
 ; {
-;	u8 id;		// XWIDGET_WINDOW
+;	u8 id;		// XWIDGET_CPNT_WINDOW
 ;	u32 color;
 ;	u8 reserved[251];
 ; }
@@ -53,7 +53,7 @@ xwidget_find_component:
 	add ebx, 256*256	; points to end of array
 
 .loop:
-	cmp byte[eax], XWIDGET_NONE
+	cmp byte[eax], XWIDGET_CPNT_NONE
 	je .found
 
 	add eax, 256
@@ -100,16 +100,16 @@ xwidget_redraw:
 	cmp esi, [.components_end]
 	jge .quit
 
-	cmp byte[esi], XWIDGET_NONE
-	je .skip
+	;cmp byte[esi], XWIDGET_CPNT_NONE
+	;je .skip
 
-	cmp byte[esi], XWIDGET_BUTTON
+	cmp byte[esi], XWIDGET_CPNT_BUTTON
 	je .draw_button
 
-	cmp byte[esi], XWIDGET_LABEL
+	cmp byte[esi], XWIDGET_CPNT_LABEL
 	je .draw_label
 
-	cmp byte[esi], XWIDGET_GBUTTON
+	cmp byte[esi], XWIDGET_CPNT_GBUTTON
 	je .draw_gbutton
 
 .skip:

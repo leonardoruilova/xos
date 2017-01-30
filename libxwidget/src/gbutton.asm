@@ -1,13 +1,13 @@
 
 ;; xOS -- libxwidget 1
-;; Copyright (c) 2017 by Omar Mohammad, all rights reserved.
+;; Copyright (c) 2017 by Omar Mohammad.
 
 use32
 
 ;
 ; typedef struct gbutton_component
 ; {
-;	u8 id;		// XWIDGET_GBUTTON
+;	u8 id;		// XWIDGET_CPNT_GBUTTON
 ;	u32 text;
 ;	u16 x;
 ;	u16 y;
@@ -62,7 +62,7 @@ xwidget_create_gbutton:
 	mov [.component], eax
 
 	; make a button
-	mov byte[eax], XWIDGET_GBUTTON
+	mov byte[eax], XWIDGET_CPNT_GBUTTON
 	mov edx, [.text]
 	mov dword[eax+GBUTTON_TEXT], edx
 

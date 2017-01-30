@@ -1,13 +1,13 @@
 
 ;; xOS -- libxwidget 1
-;; Copyright (c) 2017 by Omar Mohammad, all rights reserved.
+;; Copyright (c) 2017 by Omar Mohammad.
 
 use32
 
 ;
 ; typedef struct textbox_component
 ; {
-;	u8 id;			// XWIDGET_TEXTBOX
+;	u8 id;			// XWIDGET_CPNT_TEXTBOX
 ;	u8 flags;		// described below
 ;	u16 x;
 ;	u16 y;

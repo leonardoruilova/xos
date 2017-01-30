@@ -1,13 +1,13 @@
 
 ;; xOS -- libxwidget 1
-;; Copyright (c) 2017 by Omar Mohammad, all rights reserved.
+;; Copyright (c) 2017 by Omar Mohammad.
 
 use32
 
 ;
 ; typedef struct label_component
 ; {
-;	u8 id;			// XWIDGET_LABEL
+;	u8 id;			// XWIDGET_CPNT_LABEL
 ;	u32 text;		// pointer
 ;	u16 x;
 ;	u16 y;
@@ -40,7 +40,7 @@ xwidget_create_label:
 	mov [.component], eax
 
 	; make the label here
-	mov byte[eax], XWIDGET_LABEL
+	mov byte[eax], XWIDGET_CPNT_LABEL
 	mov ebx, [.text]
 	mov [eax+1], ebx
 	mov bx, [.x]

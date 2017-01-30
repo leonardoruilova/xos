@@ -1,6 +1,6 @@
 
 ;; xOS32
-;; Copyright (C) 2016-2017 by Omar Mohammad, all rights reserved.
+;; Copyright (C) 2016-2017 by Omar Mohammad.
 
 use32
 
