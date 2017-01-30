@@ -1005,7 +1005,7 @@ wm_mouse_event:
 	jnz .done
 
 	; make sure the mouse is actually on the window title bar
-	mov ecx, [mouse_y]
+	mov ecx, [mouse_old_y]
 	mov dx, [esi+WINDOW_Y]
 	cmp cx, dx
 	jl .done
@@ -1015,7 +1015,7 @@ wm_mouse_event:
 	;jg .done
 	jg .drag_canvas
 
-	mov ecx, [mouse_x]
+	mov ecx, [mouse_old_x]
 	mov dx, [esi+WINDOW_X]
 	cmp cx, dx
 	jl .done
