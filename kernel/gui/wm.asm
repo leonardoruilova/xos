@@ -68,35 +68,8 @@ wm_background			dd 0
 wm_running			db 0
 ;wm_dirty			db 1	; when set to 1, the WM needs a redraw
 
-; Window Theme!
-; TO-DO: Set these values from a theme file from the disk (i.e. make the gui customizable)
-align 4
-wm_color			dd 0x808080
-;wm_color			dd 0x004288
-window_title			dd 0xFFFFFF
-window_inactive_title		dd 0xC0C0C0
-window_border			dd 0x383838
-window_active_border		dd 0x383838
-window_active_outline		dd 0x00A2E8
-window_close_color		dd 0xD80000
-window_background		dd 0xD0D0D0
-window_opacity			db 1		; valid values are 0 to 4, 0 = opaque, 1 = less transparent, 4 = most transparent.
-
-align 4
-window_border_x_min		dw 0		; min x pos for a 0 width window
-window_border_y_min		dw 24		; min y pos for a 0 height window
-window_close_position		db 0		; 0 = left, 1 = right, for now this has no effect
-
-align 4
-window_close_x			dw 4
-window_close_y			dw 4
-window_close_width		dw 16
-window_close_height		dw 16
-
-window_title_x			dw 24
-window_title_y			dw 4
-window_canvas_x			dw 0
-window_canvas_y			dw 24
+; Default Window Theme
+include				"kernel/gui/themes/default.asm"
 
 default_wallpaper		db "wp1.bmp",0	; file to use as wallpaper
 
@@ -729,6 +702,9 @@ align 32
 	mov cl, [window_opacity]
 	call alpha_fill_rect
 
+	cmp [window_active_outline], -1
+	je .skip_outline
+
 	; and the outline
 	mov ax, [.x]
 	mov bx, [.y]
@@ -738,6 +714,7 @@ align 32
 	mov edx, [window_active_outline]
 	call fill_rect
 
+.skip_outline:
 	; the close button
 	mov ax, [.x]
 	mov bx, [.y]
@@ -776,7 +753,7 @@ align 32
 	mov bx, [.y]
 	mov si, [.width]
 	mov di, [.height]
-	mov edx, [window_active_border]
+	mov edx, [window_border]
 	mov cl, 1
 	call alpha_fill_rect
 

@@ -378,8 +378,10 @@ blkdev_read:
 
 .ata_drive		db 0
 .ahci_port		db 0
+align 4
 .buffer			dd 0
 .count			dd 0
+align 8
 .lba			dq 0
 
 

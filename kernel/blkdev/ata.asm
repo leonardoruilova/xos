@@ -601,9 +601,12 @@ ata_read_lba28:
 	mov al, 0
 	ret
 
+align 2
 .io			dw 0
 .drive			db 0
 .device			db 0
+
+align 4
 .count			dd 0
 .current_count		dd 0
 .buffer			dd 0

@@ -175,6 +175,8 @@ ahci_detect:
 ; Disables caching
 
 ahci_disable_cache:
+	ret
+
 	wbinvd
 	mov eax, cr0
 	or eax, 0x60000000
@@ -185,6 +187,8 @@ ahci_disable_cache:
 ; Enables caching
 
 ahci_enable_cache:
+	ret
+
 	wbinvd
 	mov eax, cr0
 	and eax, not 0x60000000
@@ -259,8 +263,8 @@ ahci_handoff:
 ahci_start:
 	pusha
 
-	mov eax, cr0
-	mov [.tmp], eax
+	;mov eax, cr0
+	;mov [.tmp], eax
 
 	mov [.port], bl
 	call ahci_disable_cache
@@ -276,8 +280,8 @@ ahci_start:
 
 	or dword[edi+AHCI_PORT_COMMAND], AHCI_COMMAND_START or AHCI_COMMAND_FIS_RECEIVE
 
-	mov eax, [.tmp]
-	mov cr0, eax
+	;mov eax, [.tmp]
+	;mov cr0, eax
 	popa
 	ret
 
@@ -292,8 +296,8 @@ ahci_start:
 ahci_stop:
 	pusha
 
-	mov eax, cr0
-	mov [.tmp], eax
+	;mov eax, cr0
+	;mov [.tmp], eax
 
 	mov [.port], bl
 	call ahci_disable_cache
@@ -313,8 +317,8 @@ ahci_stop:
 	; disable FIS receive
 	and dword[edi+AHCI_PORT_COMMAND], not AHCI_COMMAND_FIS_RECEIVE
 
-	mov eax, [.tmp]
-	mov cr0, eax
+	;mov eax, [.tmp]
+	;mov cr0, eax
 
 	popa
 	ret
@@ -414,8 +418,8 @@ ahci_identify:
 	or dword[edi+AHCI_PORT_COMMAND_ISSUE], 1
 
 .loop:
-	sti
-	hlt
+	;sti
+	;hlt
 	test dword[edi+AHCI_PORT_TASK_FILE], 0x01	; error
 	jnz .error
 	test dword[edi+AHCI_PORT_TASK_FILE], 0x20	; drive fault
@@ -619,8 +623,8 @@ ahci_read:
 	or dword[edi+AHCI_PORT_COMMAND_ISSUE], 1
 
 .loop:
-	sti
-	hlt
+	;sti
+	;hlt
 	test dword[edi+AHCI_PORT_TASK_FILE], 0x01	; error
 	jnz .error
 	test dword[edi+AHCI_PORT_TASK_FILE], 0x20	; drive fault
@@ -728,8 +732,10 @@ ahci_read:
 	mov ax, 0xFF01
 	ret
 
+align 8
 .lba			dq 0
 .port			db 0
+align 4
 .count			dd 0
 .buffer			dd 0
 .buffer_phys		dd 0
