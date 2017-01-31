@@ -435,10 +435,10 @@ ata_irq_secondary:
 ata_read:
 	; To save performance, only use LBA48 if it's nescessary
 	; There's no reason to use almost twice the IO bandwidth when we can avoid it
-	;cmp edx, 0
-	;jne ata_read_lba48
-	;cmp eax, 0xFFFFFFF-256
-	;jge ata_read_lba48
+	cmp edx, 0
+	jne ata_read_lba48
+	cmp eax, 0xFFFFFFF-256
+	jge ata_read_lba48
 
 	jmp ata_read_lba28
 
@@ -486,9 +486,15 @@ ata_read_lba28:
 	out dx, al
 	call iowait
 
-	; sector count
+	; tell the controller we'll be using PIO
 	mov dx, [.io]
-	add dx, 2		; 0x1F2
+	inc dx			; 0x1F1
+	xor al, al
+	out dx, al
+	call iowait
+
+	; sector count
+	inc dx			; 0x1F2
 	mov eax, [.count]
 	out dx, al
 
@@ -611,6 +617,212 @@ align 4
 .current_count		dd 0
 .buffer			dd 0
 .lba			dd 0
+.err_msg		db "Error in ATA device ",0
+.err_msg2		db ", command 0x",0
+.err_msg3		db ", LBA 0x",0
+.err_msg4		db ", count 0x",0
+.err_msg5		db ", status 0x",0
+
+; ata_read_lba48:
+; Reads from an ATA device using LBA48
+
+ata_read_lba48:
+	mov [.drive], bl
+	mov [.count], ecx
+	mov [.buffer], edi
+	mov dword[.lba], eax
+	mov dword[.lba+4], edx
+	mov [.current_count], 0
+
+	cmp [.count], 0
+	je .error
+
+	test [.drive], 2		; secondary/primary channel?
+	jnz .secondary
+
+	mov dx, [ata_primary]
+	mov [.io], dx
+	jmp .check_device
+
+.secondary:
+	mov dx, [ata_secondary]
+	mov [.io], dx
+
+.check_device:
+	test [.drive], 1		; primary/slave device?
+	jnz .slave
+
+	mov [.device], 0x40
+	jmp .start
+
+.slave:
+	mov [.device], 0x50
+
+.start:
+	; select the device
+	mov al, [.device]
+	mov dx, [.io]
+	add dx, 6
+	out dx, al
+	call iowait
+
+	; tell the controller we'll be using PIO
+	mov dx, [.io]
+	inc dx			; 0x1F1
+	xor al, al
+	out dx, al
+	call iowait
+
+	; sector count high
+	inc dx			; 0x1F2
+	xor al, al
+	out dx, al
+
+	; LBA high bytes
+	inc dx			; 0x1F3
+	mov al, byte[.lba+3]
+	out dx, al
+
+	inc dx			; 0x1F4
+	mov al, byte[.lba+4]
+	out dx, al
+
+	inc dx			; 0x1F5
+	mov al, byte[.lba+5]
+	out dx, al
+	call iowait
+
+	; sector count low
+	mov dx, [.io]
+	add dx, 2		; 0x1F2
+	mov eax, [.count]
+	out dx, al
+
+	inc dx			; 0x1F3
+	mov al, byte[.lba]
+	out dx, al
+
+	inc dx			; 0x1F4
+	mov al, byte[.lba+1]
+	out dx, al
+
+	inc dx			; 0x1F5
+	mov al, byte[.lba+2]
+	out dx, al
+	call iowait
+
+	inc dx
+	inc dx
+
+	mov al, ATA_READ_LBA48		; send command
+	out dx, al
+	call iowait
+
+	in al, dx
+	cmp al, 0
+	je .error
+	cmp al, 0xFF
+	je .error
+
+.wait_for_bsy:
+	in al, dx
+	test al, 0x80
+	jnz .wait_for_bsy
+
+.wait_for_drq:
+	in al, dx
+	test al, 8		; drq?
+	jnz .read_sector
+	test al, 1		; err?
+	jnz .error
+	test al, 0x20		; df?
+	jnz .error
+	jmp .wait_for_drq
+
+.read_sector:
+	; read a single sector
+	mov edi, [.buffer]
+	mov dx, [.io]
+	mov ecx, 256
+	rep insw
+	mov [.buffer], edi
+
+	; give the drive time to refresh its buffers and status
+	call iowait
+	call iowait
+
+	inc [.current_count]
+	mov ecx, [.count]
+	cmp [.current_count], ecx
+	jge .done
+
+	mov dx, [.io]
+	add dx, 7
+	jmp .wait_for_drq
+
+.error:
+	mov esi, .err_msg
+	call kprint
+	movzx eax, [.drive]
+	call int_to_string
+	call kprint
+	mov esi, .err_msg2
+	call kprint
+	mov al, ATA_READ_LBA48
+	call hex_byte_to_string
+	call kprint
+	mov esi, .err_msg3
+	call kprint
+	mov eax, dword[.lba]
+	mov edx, dword[.lba+4]
+	call hex_qword_to_string
+	call kprint
+	mov esi, .err_msg4
+	call kprint
+	mov eax, [.count]
+	call hex_byte_to_string
+	call kprint
+	mov esi, .err_msg5
+	call kprint
+	mov dx, [.io]
+	add dx, 7
+	in al, dx
+	call hex_byte_to_string
+	call kprint
+	mov esi, newline
+	call kprint
+
+	mov dx, [.io]
+	add dx, 7		; status
+	in al, dx
+	mov ah, al
+	mov al, 1
+
+	push eax
+	call ata_reset
+	pop eax
+	ret
+
+.done:
+	mov dx, [.io]
+	add dx, 7
+	in al, dx
+	mov ah, al
+	mov al, 0
+	ret
+
+align 2
+.io			dw 0
+.drive			db 0
+.device			db 0
+
+align 4
+.count			dd 0
+.current_count		dd 0
+.buffer			dd 0
+
+align 8
+.lba			dq 0
 .err_msg		db "Error in ATA device ",0
 .err_msg2		db ", command 0x",0
 .err_msg3		db ", LBA 0x",0
