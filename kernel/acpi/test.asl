@@ -33,6 +33,12 @@ DefinitionBlock ("test.aml", "DSDT", 1, "LENOVO", "CB-01   ", 0x00000001)
 		}
 	}
 
+	Name(_PRT, Package(2)
+	{
+		Package(4) { 1,2,3,4 },
+		Package(4) { 5,6,7,8 }
+	})
+
 	// For testing returning packages and package parsing
 	Method(_S4_, 0, Serialized)
 	{

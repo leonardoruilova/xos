@@ -647,6 +647,9 @@ acpi_parse_package:
 	cmp al, AML_OPCODE_QWORDPREFIX
 	je .qword
 
+	cmp al, AML_OPCODE_PACKAGE
+	je .package_entry
+
 	inc [.current_index]
 	jmp .loop
 
@@ -728,6 +731,20 @@ acpi_parse_package:
 	je .done
 
 	add esi, 8
+	inc [.current_index]
+	jmp .loop
+
+.package_entry:
+	mov eax, esi
+	dec eax		; pointer to package
+	xor edx, edx
+
+	mov cl, [.current_index]
+	cmp cl, [.index]
+	je .done
+
+	call acpi_parse_size		; package size
+	add esi, eax
 	inc [.current_index]
 	jmp .loop
 
@@ -936,8 +953,8 @@ acpi_execute_method:
 	cmp al, AML_OPCODE_PACKAGE
 	je acpi_do_package
 
-	cmp al, AML_OPCODE_STORE
-	je acpi_do_store
+	;cmp al, AML_OPCODE_STORE
+	;je acpi_do_store
 
 	jmp .bad_opcode
 

@@ -7,7 +7,7 @@ org 0x1000
 
 	jmp 0x0000:kmain16
 
-	kernel_version			db "xOS32 v0.08 (30 January 2017)",0
+	kernel_version			db "xOS32 v0.08 (31 January 2017)",0
 	copyright_str			db "Copyright (C) 2016-2017 by Omar Mohammad.",0
 	newline				db 10,0
 
@@ -77,13 +77,6 @@ kmain16:
 	call do_vbe
 
 	; prepare to go to pmode
-	; disable NMI
-	mov al, 0x80
-	out 0x70, al
-	out 0x80, al
-	out 0x80, al
-	in al, 0x71
-
 	; notify the BIOS we're going to work in pmode
 	mov eax, 0xEC00
 	mov ebx, 1
