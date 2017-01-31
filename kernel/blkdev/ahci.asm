@@ -60,6 +60,8 @@ SATA_READ_LBA28			= 0xC8
 SATA_READ_LBA48			= 0x25
 SATA_WRITE_LBA28		= 0xCA
 SATA_WRITE_LBA48		= 0x35
+SATA_FLUSH_LBA28		= 0xE7
+SATA_FLUSH_LBA48		= 0xEA
 
 pci_ahci_bus			db 0
 pci_ahci_slot			db 0
@@ -428,8 +430,7 @@ ahci_identify:
 	test dword[edi+AHCI_PORT_COMMAND_ISSUE], 1
 	jz .after_loop
 
-	loop .loop
-	jmp .error
+	jmp .loop
 
 .after_loop:
 	; turn off the command execution
@@ -633,8 +634,7 @@ ahci_read:
 	test dword[edi+AHCI_PORT_COMMAND_ISSUE], 1
 	jz .after_loop
 
-	loop .loop
-	jmp .error
+	jmp .loop
 
 .after_loop:
 	; turn off the command execution
