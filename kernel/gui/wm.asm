@@ -172,8 +172,33 @@ wm_init:
 	mov eax, [.tmp_memory]
 	call kfree
 
+	mov esi, [screen.width]
+	cmp [wm_wallpaper_width], si
+	jne .resize
+
+	mov esi, [screen.height]
+	cmp [wm_wallpaper_height], si
+	jne .resize
+
+.finish:
 	;mov [wm_dirty], 1
 	call wm_redraw
+	ret
+
+.resize:
+	mov edx, [wm_wallpaper]
+	mov ax, [wm_wallpaper_width]
+	mov bx, [wm_wallpaper_height]
+	mov esi, [screen.width]
+	mov edi, [screen.height]
+	call stretch_buffer
+	mov [wm_wallpaper], eax
+
+	mov esi, [screen.width]
+	mov edi, [screen.height]
+
+	mov [wm_wallpaper_width], si
+	mov [wm_wallpaper_height], di
 	ret
 
 .no_wallpaper:

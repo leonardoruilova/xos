@@ -6,6 +6,8 @@ use16
 
 VBE_PHYSICAL_BUFFER		= 0xDF000000
 VBE_BACK_BUFFER			= 0xDF800000
+
+; default width/height when EDID is unavailable or unusable
 DEFAULT_WIDTH			= 800
 DEFAULT_HEIGHT			= 600
 
@@ -66,6 +68,33 @@ mode_info_block:
 	.off_screen_mem_size	dw 0
 	.reserved1:		times 206 db 0
 
+align 16
+vbe_edid:
+	.padding:		times 8 db 0
+	.manufacturer_id	dw 0
+	.edid_code		dw 0
+	.serial_number		dd 0
+	.week_number		db 0
+	.manufacturer_year	db 0
+	.edid_version		db 0
+	.edid_revision		db 0
+	.video_input		db 0
+	.width_cm		db 0
+	.height_cm		db 0
+	.gamma_factor		db 0
+	.dpms_flags		db 0
+	.chroma:		times 10 db 0
+	.timings1		db 0
+	.timings2		db 0
+	.reserved_timing	db 0
+	.standard_timings:	times 8 dw 0
+	.timing_desc1:		times 18 db 0
+	.timing_desc2:		times 18 db 0
+	.timing_desc3:		times 18 db 0
+	.timing_desc4:		times 18 db 0
+	.reserved		db 0
+	.checksum		db 0
+
 align 32
 screen:
 	.width			dd 0
@@ -101,7 +130,60 @@ do_vbe:
 	cmp [vbe_info_block.version], 0x200
 	jl .old_vbe
 
-	; try 32bpp mode
+	; read the EDID and determine proper mode for this monitor
+	push es
+	mov ax, 0x4F15
+	mov bl, 1
+	mov cx, 0
+	mov dx, 0
+	mov di, vbe_edid
+	int 0x10
+	pop es
+
+	cmp ax, 0x4F	; function succeeded?
+	jne .use_default
+
+	; determine the preferred mode
+	; the first timing descriptor should contain the preferred resolution
+	; if it doesn't contain a timing descriptor, ignore the edid and use the defaults
+	cmp byte[vbe_edid.timing_desc1], 0x00
+	je .use_default
+
+	movzx ax, byte[vbe_edid.timing_desc1+2]	; low byte of preferred width
+	mov [vbe_width], ax
+	movzx ax, byte[vbe_edid.timing_desc1+4]
+	and ax, 0xF0
+	shl ax, 4
+	or [vbe_width], ax
+
+	movzx ax, byte[vbe_edid.timing_desc1+5]	; low byte of preferred height
+	mov [vbe_height], ax
+	movzx ax, byte[vbe_edid.timing_desc1+7]
+	and ax, 0xF0
+	shl ax, 4
+	or [vbe_height], ax
+
+	; ensure they are valid
+	cmp [vbe_width], 0
+	je .use_default
+
+	cmp [vbe_height], 0
+	je .use_default
+
+	; set the mode
+	mov ax, [vbe_width]
+	mov bx, [vbe_height]
+	mov cl, 32
+	call vbe_set_mode
+	jc .use_default		; if it failed, try to use the default
+
+	ret
+
+.use_default:
+	mov [vbe_width], DEFAULT_WIDTH
+	mov [vbe_height], DEFAULT_HEIGHT
+
+.set_mode:
 	mov ax, [vbe_width]
 	mov bx, [vbe_height]
 	mov cl, 32

@@ -842,6 +842,117 @@ align 32
 .bytes_per_line				dd 0
 .last_line				dd 0
 
+; stretch_buffer:
+; Stretches a pixel buffer
+; In\	EDX = Pointer to image data
+; In\	AX/BX = Current width/height
+; In\	SI/DI = New width/height
+; Out\	EAX = Pointer to pixel buffer
+
+stretch_buffer:
+	mov [.old_buffer], edx
+	mov [.old_width], ax
+	mov [.old_height], bx
+	mov [.new_width], si
+	mov [.new_height], di
+
+	movzx eax, [.new_width]
+	movzx ebx, [.new_height]
+	mul ebx
+	mov ecx, eax
+	shl ecx, 2
+	call kmalloc
+	mov [.new_buffer], eax
+
+	mov [.i], 0
+	mov [.j], 0
+
+	movzx eax, [.old_width]
+	shl eax, 16
+	movzx ebx, [.new_width]
+	mov edx, 0
+	div ebx
+	inc eax
+	mov [.x_ratio], eax
+
+	movzx eax, [.old_height]
+	shl eax, 16
+	movzx ebx, [.new_height]
+	mov edx, 0
+	div ebx
+	inc eax
+	mov [.y_ratio], eax
+
+.loop:
+	mov edx, [.j]
+	cmp dx, [.new_width]
+	jge .loop_finish
+
+	mov eax, [.j]
+	mov ebx, [.x_ratio]
+	mul ebx
+	shr eax, 16
+	mov [.x2], eax
+
+	mov eax, [.i]
+	mov ebx, [.y_ratio]
+	mul ebx
+	shr eax, 16
+	mov [.y2], eax
+
+	mov eax, [.y2]
+	movzx ebx, [.old_width]
+	mul ebx
+	add eax, [.x2]
+	shl eax, 2
+	add eax, [.old_buffer]
+	mov [.source], eax
+
+	mov eax, [.i]
+	movzx ebx, [.new_width]
+	mul ebx
+	add eax, [.j]
+	shl eax, 2
+	add eax, [.new_buffer]
+	mov [.dest], eax
+
+	mov esi, [.source]
+	mov edi, [.dest]
+	movsd
+
+	inc [.j]
+	jmp .loop
+
+.loop_finish:
+	mov [.j], 0
+	inc [.i]
+	mov edx, [.i]
+	cmp dx, [.new_height]
+	jge .finish
+
+	jmp .loop
+
+.finish:
+	mov eax, [.new_buffer]
+	ret
+
+align 2
+.old_width				dw 0
+.old_height				dw 0
+.new_width				dw 0
+.new_height				dw 0
+align 4
+.old_buffer				dd 0
+.new_buffer				dd 0
+.i					dd 0
+.j					dd 0
+.x_ratio				dd 0
+.y_ratio				dd 0
+.x2					dd 0
+.y2					dd 0
+.source					dd 0
+.dest					dd 0
+
 ; alpha_blend_colors:
 ; Blends two colors smoothly
 ; In\	EAX = Foreground

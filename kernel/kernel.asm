@@ -308,6 +308,7 @@ idle_process:
 	include "kernel/misc/kprint.asm"	; debugging stuff
 	include "kernel/misc/string.asm"	; string manipulation
 	include "kernel/misc/panic.asm"		; kernel panic & exceptions
+	include "kernel/misc/math.asm"		; math functions
 
 	; Memory Manager
 	include "kernel/mm/mm.asm"		; MM initialization code
