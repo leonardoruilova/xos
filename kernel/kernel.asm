@@ -7,7 +7,7 @@ org 0x1000
 
 	jmp 0x0000:kmain16
 
-	kernel_version			db "xOS32 v0.08 (31 January 2017)",0
+	kernel_version			db "xOS32 v0.08 (2 February 2017)",0
 	copyright_str			db "Copyright (C) 2016-2017 by Omar Mohammad.",0
 	newline				db 10,0
 
@@ -357,8 +357,8 @@ idle_process:
 
 	; Default mouse cursor
 	cursor:
-	file "kernel/gui/themes/cursor_black.bmp"	; choose whichever cursor you like
-	;file "kernel/gui/themes/cursor_white.bmp"	; or even make your own; in Paint and GIMP use a 24-bit bitmap
+	;file "kernel/gui/themes/cursor_black.bmp"	; choose whichever cursor you like
+	file "kernel/gui/themes/cursor_white.bmp"	; or even make your own; in Paint and GIMP use a 24-bit bitmap
 	;file "kernel/gui/themes/cursor_big_blue.bmp"
 
 	; Default bitmap font
