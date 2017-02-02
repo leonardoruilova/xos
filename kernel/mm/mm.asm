@@ -30,15 +30,15 @@ mm_init:
 	nop
 
 	; allocate memory for the VESA framebuffer
-	mov ecx, 2048		; 8 MB
+	mov ecx, VBE_BUFFER_SIZE/4096	; in pages
 	call pmm_alloc
 	cmp eax, 0
 	je .no_mem_fb
 
 	mov ebx, eax
 	mov eax, VBE_BACK_BUFFER
-	mov ecx, 2048
-	mov dl, PAGE_PRESENT OR PAGE_WRITEABLE
+	mov ecx, VBE_BUFFER_SIZE/4096
+	mov dl, PAGE_PRESENT or PAGE_WRITEABLE
 	call vmm_map_memory
 
 	ret
@@ -122,7 +122,7 @@ memcpy:
 
 .loop:
 	prefetchnta [esi+0x80]
-	prefetchnta [esi+0xC0]
+	prefetchnta [esi+0x100]
 
 	movdqa xmm0, [esi]
 	movdqa xmm1, [esi+0x10]
@@ -169,7 +169,7 @@ memcpy_u:
 
 .loop:
 	prefetchnta [esi+0x80]
-	prefetchnta [esi+0xC0]
+	prefetchnta [esi+0x100]
 
 	movdqu xmm0, [esi]
 	movdqu xmm1, [esi+0x10]

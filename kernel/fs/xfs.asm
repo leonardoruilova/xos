@@ -7,8 +7,7 @@ use32
 ; struct file {
 ; u32 flags;		// 00
 ; u32 position;		// 04
-; u8 filename[12];	// 08
-; u8 reserved[12];	// 14
+; u8 path[120];		// 08
 ; }
 ;
 ;
@@ -18,8 +17,7 @@ use32
 FILE_FLAGS		= 0x00
 FILE_POSITION		= 0x04
 FILE_NAME		= 0x08
-FILE_RESERVED		= 0x14
-FILE_HANDLE_SIZE	= 0x20
+FILE_HANDLE_SIZE	= 0x80
 
 ; Max no. of files the kernel can handle
 MAXIMUM_FILE_HANDLES	= 512		; increase this in the future
@@ -30,17 +28,16 @@ FILE_WRITE		= 0x00000002
 FILE_READ		= 0x00000004
 
 ; XFS File Entry Structure
-XFS_FILENAME		= 0
-XFS_RESERVED0		= 11
-XFS_LBA			= 12
-XFS_SIZE_SECTORS	= 16
-XFS_SIZE		= 20
-XFS_HOUR		= 24
-XFS_MINUTE		= 25
-XFS_DAY			= 26
-XFS_MONTH		= 27
-XFS_YEAR		= 28
-XFS_RESERVED1		= 30
+XFS_FILENAME		= 0x00
+XFS_LBA			= 0x20
+XFS_SIZE_SECTORS	= 0x24
+XFS_SIZE		= 0x28
+XFS_HOUR		= 0x2C
+XFS_MINUTE		= 0x2D
+XFS_DAY			= 0x2E
+XFS_MONTH		= 0x2F
+XFS_YEAR		= 0x30
+XFS_FLAGS		= 0x32
 
 ; Constants For Seeking in File
 SEEK_SET		= 0x00
@@ -48,7 +45,7 @@ SEEK_CUR		= 0x01
 SEEK_END		= 0x02
 
 XFS_SIGNATURE_MBR	= 0xF3		; in mbr partition table
-XFS_ROOT_SIZE		= 32
+XFS_ROOT_SIZE		= 64
 XFS_ROOT_ENTRIES	= 512
 
 file_handles		dd 0
@@ -108,7 +105,7 @@ xfs_open:
 
 	; store information in the handle
 	mov eax, [.handle]
-	shl eax, 5		; mul 32
+	shl eax, 7		; mul 128
 	add eax, [file_handles]
 
 	mov edx, [.permission]
@@ -179,7 +176,7 @@ xfs_close:
 
 	; just clear the entire file handle ;)
 	mov eax, [.handle]
-	shl eax, 5		; mul 32
+	shl eax, 7		; mul 128
 	add eax, [file_handles]
 	mov edi, eax
 	mov ecx, FILE_HANDLE_SIZE
@@ -206,7 +203,7 @@ xfs_seek:
 	mov [.base], ebx
 	mov [.dest], ecx
 
-	shl eax, 5	; mul 32
+	shl eax, 7	; mul 128
 	add eax, [file_handles]
 	mov [.handle], eax
 
@@ -302,7 +299,7 @@ xfs_tell:
 	cmp eax, MAXIMUM_FILE_HANDLES
 	jge .error
 
-	shl eax, 5
+	shl eax, 7
 	add eax, [file_handles]
 	test dword[eax], FILE_PRESENT
 	jz .error
@@ -325,7 +322,7 @@ xfs_read:
 	cmp eax, MAXIMUM_FILE_HANDLES
 	jge .error
 
-	shl eax, 5
+	shl eax, 7
 	add eax, [file_handles]
 	mov [.handle], eax
 
@@ -433,7 +430,7 @@ xfs_find_handle:
 	jge .bad
 
 	mov eax, [.current_handle]
-	shl eax, 5		; mul 32
+	shl eax, 7		; mul 128
 	add eax, [file_handles]
 	test dword[eax], FILE_PRESENT
 	jz .done
@@ -467,171 +464,6 @@ xfs_read_root:
 
 	ret
 
-; xfs_internal_filename:
-; Converts user filenames into internal filenames
-; In\	ESI = Filename
-; Out\	EAX = 0 on success
-; Out\	EDI = Modified filename
-
-xfs_internal_filename:
-	mov [.filename], esi
-	call strlen
-	mov [.size], eax
-	mov ecx, eax
-	mov esi, [.filename]
-	mov dl, 0xAF
-	call find_byte_in_string
-	jnc .bad_filename
-
-	mov ecx, [.size]
-	mov esi, [.filename]
-	mov dl, '/'
-	call find_byte_in_string
-	jnc .bad_filename
-
-	mov ecx, [.size]
-	mov esi, [.filename]
-	mov dl, '\'
-	call find_byte_in_string
-	jnc .bad_filename
-
-	mov esi, [.filename]
-	mov edi, xfs_new_filename
-	mov ecx, 0
-
-.loop:
-	lodsb
-	cmp al, '.'
-	je .found_dot
-
-	stosb
-	inc ecx
-	cmp ecx, 8
-	jg .bad_filename
-
-	jmp .loop
-
-.found_dot:
-	cmp edi, xfs_new_filename+8
-	je .do_extension
-
-.fill_spaces:
-	mov al, ' '
-	stosb
-	cmp edi, xfs_new_filename+8
-	je .do_extension
-	jmp .fill_spaces
-
-.do_extension:
-	push esi
-	call strlen
-	pop esi
-	mov ecx, eax
-	cmp ecx, 3
-	jg .bad_filename
-
-	mov edi, xfs_new_filename+8
-	rep movsb
-
-	mov eax, 0
-	mov edi, xfs_new_filename
-	ret
-
-.bad_filename:
-	mov edi, xfs_new_filename
-	mov al, 0xFE
-	mov ecx, 11
-	rep stosb
-	mov al, 0
-	stosb
-
-	mov eax, 1
-	mov edi, xfs_new_filename
-	ret
-
-.filename			dd 0
-.size				dd 0
-
-; xfs_external_filename:
-; Converts internal filenames into user filenames
-; In\	ESI = Filename
-; Out\	EAX = 0 on success
-; Out\	EDI = Modified filename
-
-xfs_external_filename:
-	mov [.filename], esi
-	call strlen
-	cmp eax, 11
-	jne .bad_filename
-
-	mov esi, [.filename]
-	mov dl, ' '
-	mov ecx, 9
-	call find_byte_in_string
-	jc .no_spaces
-
-	mov esi, [.filename]
-	mov ecx, 0
-	mov edi, .bad_filename
-
-.loop:
-	lodsb
-	cmp al, ' '
-	je .space
-	inc ecx
-	cmp ecx, 8
-	jge .do_extension
-	jmp .loop
-
-.space:
-
-.do_extension:
-	mov esi, [.filename]
-	add esi, 8
-	mov al, '.'
-	stosb
-
-	mov ecx, 3
-	rep movsb
-
-	mov al, 0
-	stosb
-
-	mov edi, xfs_new_filename
-	mov eax, 0
-	ret
-
-.no_spaces:
-	mov esi, [.filename]
-	mov edi, xfs_new_filename
-	mov ecx, 8
-	rep movsb
-	mov al, '.'
-	stosb
-	mov ecx, 3
-	rep movsb
-
-	mov al, 0
-	stosb
-
-	mov edi, xfs_new_filename
-	mov eax, 0
-	ret
-
-.bad_filename:
-	mov edi, xfs_new_filename
-	mov al, 0xFE
-	mov ecx, 11
-	rep stosb
-	mov al, 0
-	stosb
-
-	mov eax, 1
-	mov edi, xfs_new_filename
-	ret
-
-.filename			dd 0
-
 ; xfs_get_entry:
 ; Returns a file entry
 ; In\	ESI = Filename
@@ -640,29 +472,29 @@ xfs_external_filename:
 xfs_get_entry:
 	mov [.filename], esi
 
-	call xfs_internal_filename
-	cmp eax, 0
-	jne .error
+	mov esi, [.filename]
+	call strlen
+	inc eax
+	mov [.filename_size], eax
 
 	call xfs_read_root
 	cmp al, 0
 	jne .error
 
 	; now scan the root directory for the file name
-	mov [.current_entry], 1		; always skip the first entry
+	mov [.current_entry], 0
 	mov esi, [disk_buffer]
-	add esi, 32
 
 .loop:
 	push esi
 
-	mov edi, xfs_new_filename
-	mov ecx, 11
+	mov edi, [.filename]
+	mov ecx, [.filename_size]
 	rep cmpsb
 	je .found
 
 	pop esi
-	add esi, 32
+	add esi, 64
 
 	inc [.current_entry]
 	cmp [.current_entry], XFS_ROOT_ENTRIES
@@ -686,6 +518,7 @@ xfs_get_entry:
 
 .current_entry			dd 0
 .filename			dd 0
+.filename_size			dd 0
 .fail_msg			db "xfs: file '",0
 .fail_msg2			db "' not found.",10,0
 

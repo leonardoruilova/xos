@@ -10,17 +10,9 @@ jmp short relocate
 nop
 
 filesystem_block:
-	.formatting_tool_name		db "MKXFS   "
-	.formatting_tool_version	db 1
-	.magic_number			dd 0x7A658502
-	.formatting_time		db 11		; hour
-					db 27		; minute
-	.formatting_date		db 20
-					db 6
-					dw 2015
-	.serial_number			dd 0x65A2B744
-	.volume_label			db "XOS     "
-	.filesystem_id			db "XFS     "
+	.fs_version			db 1
+	.fs_magic			db 0xF3
+	.volume_label			db "XOS",0
 
 relocate:
 	cli
@@ -28,13 +20,13 @@ relocate:
 	push ds
 	push si
 
-	mov ax, 0
+	xor ax, ax
 	mov ds, ax
 	mov ax, 0x4000
 	mov es, ax
 
 	mov si, 0x7C00
-	mov di, 0
+	xor di, di
 	mov cx, 512
 	rep movsb
 
@@ -63,37 +55,44 @@ main:
 load_root_directory:
 	mov eax, 1
 	add eax, dword[partition.lba]
-	mov ebx, 32
+	mov ebx, 64
 	mov cx, 0x4000
 	mov dx, disk_buffer
 	call read_sectors
 	jc disk_error
 
 find_file:
-	mov si, disk_buffer+32		; each directory entry is 32 bytes in size
+	mov si, disk_buffer		; each directory entry is 32 bytes in size
 					; and the first entry is always reserved, so skip it
 	mov di, _kernel_filename
-	mov cx, 1
+	mov cx, 0
 
 .loop:
 	pusha
-	mov cx, 11
+	mov cx, _kernel_filename_size
 	rep cmpsb
 	je .found_file
 	popa
 
-	add cx, 1
+	inc cx
 	cmp cx, 512
 	je file_not_found
 
-	add si, 32
+	add si, 64
 	jmp .loop
 
 .found_file:
-	add si, 1
-	mov eax, dword[si]
+	popa
+
+	;test byte[si+0x32], 0x01	; valid entry?
+	;jz file_not_found
+
+	;test byte[si+0x32], 0x02	; directory?
+	;jnz file_not_found
+
+	mov eax, dword[si+0x20]
 	mov [.lba], eax
-	mov ebx, dword[si+4]
+	mov ebx, dword[si+0x24]
 	mov [.size], ebx
 
 	mov word[.segment], 0x100
@@ -252,7 +251,8 @@ _crlf				db 13,10,0
 _starting			db ".",0
 _disk_error			db "DE",0
 _file_not_found			db "NF",0
-_kernel_filename		db "kernel32sys"
+_kernel_filename		db "kernel32.sys"
+_kernel_filename_size		= $ - _kernel_filename
 
 times 510 - ($-$$) db 0
 dw 0xAA55

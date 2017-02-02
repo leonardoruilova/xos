@@ -27,12 +27,10 @@ redraw_screen:
 	mov esi, VBE_BACK_BUFFER
 	mov edi, VBE_PHYSICAL_BUFFER
 	mov ecx, [screen.screen_size_dqwords]
-	jmp .loop
 
-align 64
 .loop:
 	prefetchnta [esi+0x80]
-	prefetchnta [esi+0xC0]
+	prefetchnta [esi+0x100]
 
 	movdqa xmm0, [esi]
 	movdqa xmm1, [esi+0x10]
@@ -1133,9 +1131,6 @@ alpha_fill_rect:
 	movzx ecx, [.width]
 
 .aligned_loop:
-	prefetchnta [edi+16]
-	prefetchnta [edi+32]
-
 	movdqa xmm0, xmm3	; foreground
 	movdqa xmm1, [edi]	; background
 	movdqa xmm6, xmm3
@@ -1164,8 +1159,6 @@ alpha_fill_rect:
 	movzx ecx, [.width]
 
 .unaligned_loop:
-	prefetchnta [edi+16]
-
 	movdqa xmm0, xmm3	; foreground
 	movdqu xmm1, [edi]	; background
 	movdqa xmm6, xmm3
