@@ -17,14 +17,14 @@ all:
 	dd if=out/boot_hdd.bin conv=notrunc bs=512 seek=63 of=disk.hdd
 	dd if=out/rootnew.bin conv=notrunc bs=512 seek=64 of=disk.hdd
 	dd if=out/kernel32.sys conv=notrunc bs=512 seek=200 of=disk.hdd
-	dd if=out/hello.exe conv=notrunc bs=512 seek=4000 of=disk.hdd
-	dd if=out/draw.exe conv=notrunc bs=512 seek=4001 of=disk.hdd
-	dd if=out/buttontest.exe conv=notrunc bs=512 seek=4002 of=disk.hdd
-	dd if=out/calc.exe conv=notrunc bs=512 seek=4010 of=disk.hdd
-	dd if=out/shell.exe conv=notrunc bs=512 seek=4020 of=disk.hdd
-	dd if=wp/wp6.bmp conv=notrunc bs=512 seek=1000 of=disk.hdd
-	dd if=shell/shell.cfg conv=notrunc bs=512 seek=4040 of=disk.hdd
-	dd if=out/edit.exe conv=notrunc bs=512 seek=4041 of=disk.hdd
+	dd if=out/hello.exe conv=notrunc bs=512 seek=1021 of=disk.hdd
+	dd if=out/draw.exe conv=notrunc bs=512 seek=1022 of=disk.hdd
+	dd if=out/buttontest.exe conv=notrunc bs=512 seek=1042 of=disk.hdd
+	dd if=out/calc.exe conv=notrunc bs=512 seek=1062 of=disk.hdd
+	dd if=out/shell.exe conv=notrunc bs=512 seek=1000 of=disk.hdd
+	dd if=wp/wp6.bmp conv=notrunc bs=512 seek=8000 of=disk.hdd
+	dd if=shell/shell.cfg conv=notrunc bs=512 seek=1020 of=disk.hdd
+	dd if=out/edit.exe conv=notrunc bs=512 seek=1082 of=disk.hdd
 
 run:
 	qemu-system-i386 -hda disk.hdd -m 128 -vga std -serial stdio -usb

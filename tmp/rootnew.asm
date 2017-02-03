@@ -30,7 +30,7 @@ shell:
 	.name		db "shell.exe",0
 			times 32 - ($-.name) db 0
 
-	.lba		dd 4020
+	.lba		dd 1000
 	.size_sects	dd 20
 	.size_bytes	dd 20*512
 	.time		db 10+12
@@ -44,7 +44,7 @@ shellcfg:
 	.name		db "shell.cfg",0
 			times 32 - ($-.name) db 0
 
-	.lba		dd 4040
+	.lba		dd 1020
 	.size_sects	dd 1
 	.size_bytes	dd 1*512
 	.time		db 10+12
@@ -58,7 +58,7 @@ wp1:
 	.name		db "wp1.bmp",0
 			times 32 - ($-.name) db 0
 
-	.lba		dd 1000
+	.lba		dd 8000
 	.size_sects	dd 2813
 	.size_bytes	dd 1440138
 	.time		db 10+12
@@ -72,7 +72,7 @@ hello:
 	.name		db "hello.exe",0
 			times 32 - ($-.name) db 0
 
-	.lba		dd 4000
+	.lba		dd 1021
 	.size_sects	dd 1
 	.size_bytes	dd 1*512
 	.time		db 10+12
@@ -86,9 +86,9 @@ draw:
 	.name		db "draw.exe",0
 			times 32 - ($-.name) db 0
 
-	.lba		dd 4001
-	.size_sects	dd 1
-	.size_bytes	dd 1*512
+	.lba		dd 1022
+	.size_sects	dd 20
+	.size_bytes	dd 20*512
 	.time		db 10+12
 			db 48
 	.date		db 2, 2
@@ -100,9 +100,9 @@ buttontest:
 	.name		db "buttontest.exe",0
 			times 32 - ($-.name) db 0
 
-	.lba		dd 4002
-	.size_sects	dd 5
-	.size_bytes	dd 5*512
+	.lba		dd 1042
+	.size_sects	dd 20
+	.size_bytes	dd 20*512
 	.time		db 10+12
 			db 48
 	.date		db 2, 2
@@ -114,9 +114,9 @@ calc:
 	.name		db "calc.exe",0
 			times 32 - ($-.name) db 0
 
-	.lba		dd 4010
-	.size_sects	dd 10
-	.size_bytes	dd 10*512
+	.lba		dd 1062
+	.size_sects	dd 20
+	.size_bytes	dd 20*512
 	.time		db 10+12
 			db 48
 	.date		db 2, 2
@@ -128,9 +128,9 @@ edit:
 	.name		db "edit.exe",0
 			times 32 - ($-.name) db 0
 
-	.lba		dd 4041
-	.size_sects	dd 10
-	.size_bytes	dd 10*512
+	.lba		dd 1082
+	.size_sects	dd 20
+	.size_bytes	dd 20*512
 	.time		db 10+12
 			db 48
 	.date		db 2, 2
