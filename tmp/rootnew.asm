@@ -124,3 +124,18 @@ calc:
 	.flags		db 0x01		; file present
 	.reserved:	times 13 db 0
 
+edit:
+	.name		db "edit.exe",0
+			times 32 - ($-.name) db 0
+
+	.lba		dd 4041
+	.size_sects	dd 10
+	.size_bytes	dd 10*512
+	.time		db 10+12
+			db 48
+	.date		db 2, 2
+	.year		dw 2017
+	.flags		db 0x01		; file present
+	.reserved:	times 13 db 0
+
+

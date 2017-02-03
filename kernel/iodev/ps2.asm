@@ -15,17 +15,19 @@ PS2_KBD_SET_LEDS		= 0xED
 
 ; PS/2 Keyboard LEDs Bitfield
 PS2_KBD_SCROLL_LOCK		= 0x01
-;PS2_KBD_NUM_LOCK		= 0x02	; someday I'll add support for NumLock
+PS2_KBD_NUM_LOCK		= 0x02
 PS2_KBD_CAPS_LOCK		= 0x04
 
 ; Some "Control" Keys
 LEFT_SHIFT			= 0x36
 RIGHT_SHIFT			= 0x2A
 CAPS_LOCK			= 0x3A
+NUM_LOCK			= 0x45
 
 ; Keyboard Status Bitfield
 KBD_STATUS_SHIFT		= 0x01
 KBD_STATUS_CAPS_LOCK		= 0x02
+KBD_STATUS_NUM_LOCK		= 0x04
 
 ; PS/2 Mouse Commands
 PS2_MOUSE_COMMAND		= 0xD4
@@ -53,6 +55,7 @@ kbd_status			db 0
 kbd_leds			db 0
 last_scancode			db 0
 last_character			db 0
+old_scancode			db 0
 
 ; Mouse Speed
 mouse_speed			db 0		; 0 normal speed, 1 -> 4 fast speeds
@@ -226,9 +229,12 @@ ps2_kbd_init:
 	mov al, 2
 	call ps2_send
 
-	; turn off all the LEDs
-	mov al, 0
+	; turn on the numlock LED
+	mov al, PS2_KBD_NUM_LOCK
 	call ps2_kbd_set_leds
+
+	; enable numlock by default for comfortability
+	mov [kbd_status], KBD_STATUS_NUM_LOCK
 
 	; enable keyboard
 	mov al, PS2_KBD_ENABLE
@@ -292,6 +298,12 @@ ps2_kbd_irq:
 	cmp al, CAPS_LOCK		; caps lock?
 	je .toggle_caps_lock
 
+	cmp al, NUM_LOCK		; num lock?
+	je .toggle_num_lock
+
+	cmp al, 0xE0
+	je .escape_sequence
+
 	; now the key is most likely a letter or number...
 	; soon I'll add support for NumLock and the numpad
 	; but for now, we'll assume it's a "printable" character
@@ -301,45 +313,76 @@ ps2_kbd_irq:
 	and eax, 0x7F
 	mov [last_scancode], al
 
+	; check if it is an arrow key/numpad key
+	cmp [last_scancode], 0x47	; numpad 7/Home
+	jl .start
+
+	cmp [last_scancode], 0x52	; numpad 0/Insert
+	jg .start
+
+	; was it a gray key or numpad key?
+	cmp [old_scancode], 0xE0	; escape sequence
+	je .gray_key
+
+	; now we know it was a numpad key -- treat it like a gray key if numpad is off
+	test [kbd_status], KBD_STATUS_NUM_LOCK
+	jz .gray_key
+
+	; it's a numpad key -- no denying anymore...
+	jmp .start
+
+.escape_sequence:
+	mov [old_scancode], 0xE0
+	jmp .finish
+
+.start:
+	mov [old_scancode], 0
+
 	; depending on shift and caps lock state, use the appropriate key mapping
-	cmp [kbd_status], 0
-	je .normal
+	;cmp [kbd_status], 0
+	;je .normal
 
-	cmp [kbd_status], KBD_STATUS_SHIFT
-	je .shift
+	test [kbd_status], KBD_STATUS_SHIFT
+	jnz .shift
 
-	cmp [kbd_status], KBD_STATUS_CAPS_LOCK
-	je .caps_lock
+	test [kbd_status], KBD_STATUS_CAPS_LOCK
+	jnz .caps_lock
 
-	cmp [kbd_status], KBD_STATUS_SHIFT or KBD_STATUS_CAPS_LOCK
-	je .shift_caps_lock
+	test [kbd_status], KBD_STATUS_SHIFT or KBD_STATUS_CAPS_LOCK
+	jnz .shift_caps_lock
+
+	jmp .normal
 
 .normal:
 	add eax, ascii_codes
 	mov al, [eax]
 	mov [last_character], al
-	call wm_kbd_event
-	jmp .finish
+	jmp .event
 
 .shift:
 	add eax, ascii_codes_shift
 	mov al, [eax]
 	mov [last_character], al
-	call wm_kbd_event
-	jmp .finish
+	jmp .event
 
 .caps_lock:
 	add eax, ascii_codes_caps_lock
 	mov al, [eax]
 	mov [last_character], al
-	call wm_kbd_event
-	jmp .finish
+	jmp .event
 
 .shift_caps_lock:
 	add eax, ascii_codes_shift_caps_lock
 	mov al, [eax]
 	mov [last_character], al
-	call wm_kbd_event
+	jmp .event
+
+.gray_key:
+	mov [old_scancode], 0
+	mov [last_character], 0
+
+.event:
+	call wm_kbd_event	; notify the wm which will notify apps waiting for events
 	jmp .finish
 
 .turn_on_shift:
@@ -365,6 +408,24 @@ ps2_kbd_irq:
 	or [kbd_status], KBD_STATUS_CAPS_LOCK
 	mov al, [kbd_leds]
 	or al, PS2_KBD_CAPS_LOCK
+	call ps2_kbd_set_leds
+	jmp .finish
+
+.toggle_num_lock:
+	test [kbd_status], KBD_STATUS_NUM_LOCK
+	jz .turn_on_num_lock
+
+.turn_off_num_lock:
+	and [kbd_status], not KBD_STATUS_NUM_LOCK
+	mov al, [kbd_leds]
+	and al, not PS2_KBD_NUM_LOCK
+	call ps2_kbd_set_leds
+	jmp .finish
+
+.turn_on_num_lock:
+	or [kbd_status], KBD_STATUS_NUM_LOCK
+	mov al, [kbd_leds]
+	or al, PS2_KBD_NUM_LOCK
 	call ps2_kbd_set_leds
 
 .finish:

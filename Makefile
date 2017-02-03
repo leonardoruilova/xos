@@ -12,6 +12,7 @@ all:
 	fasm buttontest/buttontest.asm out/buttontest.exe
 	fasm calc/calc.asm out/calc.exe
 	fasm shell/shell.asm out/shell.exe
+	fasm edit/edit.asm out/edit.exe
 	dd if=out/mbr.bin conv=notrunc bs=512 count=1 of=disk.hdd
 	dd if=out/boot_hdd.bin conv=notrunc bs=512 seek=63 of=disk.hdd
 	dd if=out/rootnew.bin conv=notrunc bs=512 seek=64 of=disk.hdd
@@ -23,6 +24,7 @@ all:
 	dd if=out/shell.exe conv=notrunc bs=512 seek=4020 of=disk.hdd
 	dd if=wp/wp6.bmp conv=notrunc bs=512 seek=1000 of=disk.hdd
 	dd if=shell/shell.cfg conv=notrunc bs=512 seek=4040 of=disk.hdd
+	dd if=out/edit.exe conv=notrunc bs=512 seek=4041 of=disk.hdd
 
 run:
 	qemu-system-i386 -hda disk.hdd -m 128 -vga std -serial stdio -usb

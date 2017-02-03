@@ -112,6 +112,9 @@ xwidget_redraw:
 	cmp byte[esi], XWIDGET_CPNT_GBUTTON
 	je .draw_gbutton
 
+	cmp byte[esi], XWIDGET_CPNT_TEXTBOX
+	je .draw_textbox
+
 .skip:
 	add esi, 256
 	jmp .loop
@@ -199,6 +202,82 @@ xwidget_redraw:
 	add esi, 256
 	jmp .loop
 
+.draw_textbox:
+	mov [.tmp], esi
+
+	mov cx, [esi+XWIDGET_TEXTBOX_X]
+	mov dx, [esi+XWIDGET_TEXTBOX_Y]
+	mov ax, [esi+XWIDGET_TEXTBOX_WIDTH]
+	mov bx, [esi+XWIDGET_TEXTBOX_HEIGHT]
+
+	test byte[esi+XWIDGET_TEXTBOX_FLAGS], XWIDGET_TEXTBOX_FOCUSED
+	jnz .draw_textbox_focus
+
+	mov esi, [xwidget_outline]
+	jmp .draw_textbox_start
+
+.draw_textbox_focus:
+	mov esi, [xwidget_outline_focus]
+
+.draw_textbox_start:
+	mov edi, [.handle]
+	call xwidget_fill_rect
+
+	mov esi, [.tmp]
+	mov cx, [esi+XWIDGET_TEXTBOX_X]
+	mov dx, [esi+XWIDGET_TEXTBOX_Y]
+	mov ax, [esi+XWIDGET_TEXTBOX_WIDTH]
+	mov bx, [esi+XWIDGET_TEXTBOX_HEIGHT]
+	inc cx
+	inc dx
+	sub ax, 2
+	sub bx, 2
+
+	mov esi, [xwidget_textbox_bg]
+	mov edi, [.handle]
+	call xwidget_fill_rect
+
+	; draw the textbox, character by character
+	mov esi, [.tmp]
+	mov ax, [esi+XWIDGET_TEXTBOX_POSITION_X]
+	mov [.textbox_position_x], ax
+	mov ax, [esi+XWIDGET_TEXTBOX_POSITION_Y]
+	mov [.textbox_position_y], ax
+
+	mov eax, [esi+XWIDGET_TEXTBOX_TEXT]
+	mov [.textbox_text], eax
+
+	mov ax, [esi+XWIDGET_TEXTBOX_X]
+	inc ax
+	mov [.textbox_x], ax
+
+	mov ax, [esi+XWIDGET_TEXTBOX_Y]
+	inc ax
+	mov [.textbox_y], ax
+
+	mov esi, [.textbox_text]
+	mov ebp, XOS_WM_DRAW_TEXT
+	mov cx, [.textbox_x]
+	mov dx, [.textbox_y]
+	mov eax, [.handle]
+	mov ebx, [xwidget_textbox_fg]
+	int 0x60
+
+	mov edi, [.handle]
+	mov cx, [.textbox_position_x]
+	mov dx, [.textbox_position_y]
+	add cx, [.textbox_x]
+	add dx, [.textbox_y]
+	mov ax, 1
+	mov bx, 16
+	mov esi, [xwidget_textbox_fg]
+	call xwidget_fill_rect
+
+.textbox_done:
+	mov esi, [.tmp]
+	add esi, 256
+	jmp .loop
+
 .quit:
 	; request a redraw from the kernel
 	mov ebp, XOS_WM_REDRAW
@@ -210,6 +289,11 @@ align 4
 .components		dd 0
 .components_end		dd 0
 .tmp			dd 0
+.textbox_text		dd 0
+.textbox_position_x	dw 0
+.textbox_position_y	dw 0
+.textbox_x		dw 0
+.textbox_y		dw 0
 
 ; xwidget_destroy_component:
 ; Destroys a component on a window

@@ -6,8 +6,8 @@ wm_color			dd 0x808080
 ;wm_color			dd 0x004288
 window_title			dd 0xFFFFFF
 window_inactive_title		dd 0xC0C0C0
-window_border			dd 0x383838
-window_active_border		dd 0x383838
+window_border			dd 0x303030
+window_active_border		dd 0x303030
 window_active_outline		dd 0x00A2E8
 window_close_color		dd 0xD80000
 window_background		dd 0xD0D0D0

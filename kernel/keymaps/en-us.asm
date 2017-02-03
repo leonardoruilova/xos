@@ -17,8 +17,9 @@ ascii_codes:
 	db "\zxcvbnm,./",0
 	db "*",0
 	db " "
-	db 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	db "-",0,0,0,"+"
+	db 0,0,0,0,0,0,0,0,0,0,0,0,0,"789"
+	db "-456+"
+	db "1230."
 	times 128 - ($-ascii_codes) db 0
 
 align 16
@@ -31,8 +32,9 @@ ascii_codes_caps_lock:
 	db "\ZXCVBNM,./",0
 	db "*",0
 	db " "
-	db 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	db "-",0,0,0,"+"
+	db 0,0,0,0,0,0,0,0,0,0,0,0,0,"789"
+	db "-456+"
+	db "1230."
 	times 128 - ($-ascii_codes_caps_lock) db 0
 
 align 16
@@ -45,8 +47,9 @@ ascii_codes_shift:
 	db "|ZXCVBNM<>?",0
 	db "*",0
 	db " "
-	db 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	db "-",0,0,0,"+"
+	db 0,0,0,0,0,0,0,0,0,0,0,0,0,"789"
+	db "-456+"
+	db "1230."
 	times 128 - ($-ascii_codes_shift) db 0
 
 align 16
@@ -59,8 +62,9 @@ ascii_codes_shift_caps_lock:
 	db "|zxcvbnm<>?",0
 	db "*",0
 	db " "
-	db 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	db "-",0,0,0,"+"
+	db 0,0,0,0,0,0,0,0,0,0,0,0,0,"789"
+	db "-456+"
+	db "1230."
 	times 128 - ($-ascii_codes_shift_caps_lock) db 0
 
 

@@ -230,6 +230,9 @@ xwidget_wait_event:
 	test ax, WM_LEFT_CLICK
 	jnz .clicked
 
+	test ax, WM_KEYPRESS
+	jnz .keypress
+
 .skip:
 	inc [.current_window]
 	cmp [.current_window], XWIDGET_MAX_WINDOWS
@@ -260,7 +263,7 @@ xwidget_wait_event:
 	mov [.x], cx
 	mov [.y], dx
 
-	; check which button was pressed
+	; check which component was pressed
 	mov eax, [.current_window]
 	shl eax, 3
 	add eax, xwidget_windows_data
@@ -273,20 +276,23 @@ xwidget_wait_event:
 
 	mov esi, [.components]
 
-.loop:
+.clicked_loop:
 	cmp esi, [.components_end]
 	jge .start
 
 	cmp byte[esi], XWIDGET_CPNT_BUTTON
-	je .found_button
+	je .clicked_button
 
 	cmp byte[esi], XWIDGET_CPNT_GBUTTON
-	je .found_gbutton
+	je .clicked_gbutton
+
+	cmp byte[esi], XWIDGET_CPNT_TEXTBOX	; textboxes can be clicked to "get focused"
+	je .clicked_textbox
 
 	add esi, 256
-	jmp .loop
+	jmp .clicked_loop
 
-.found_button:
+.clicked_button:
 	mov [.tmp], esi
 
 	mov cx, [esi+5]
@@ -306,64 +312,205 @@ xwidget_wait_event:
 	mov cx, [.x]
 	mov dx, [.y]
 	cmp cx, [.button_x]
-	jl .continue
+	jl .clicked_continue
 
 	cmp dx, [.button_y]
-	jl .continue
+	jl .clicked_continue
 
 	cmp cx, [.button_end_x]
-	jg .continue
+	jg .clicked_continue
 
 	cmp dx, [.button_end_y]
-	jg .continue
+	jg .clicked_continue
+
+	mov eax, [.current_window]
+	call xwidget_remove_focus
 
 	mov eax, XWIDGET_BUTTON
 	mov ebx, [.tmp]
 	ret
 
-.found_gbutton:
+.clicked_gbutton:
 	mov [.tmp], esi
 
 	mov cx, [.x]	; mouse pos
 	mov dx, [.y]
 
 	cmp cx, [esi+GBUTTON_X]
-	jl .continue
+	jl .clicked_continue
 
 	cmp dx, [esi+GBUTTON_Y]
-	jl .continue
+	jl .clicked_continue
 
 	cmp cx, [esi+GBUTTON_END_X]
-	jg .continue
+	jg .clicked_continue
 
 	cmp dx, [esi+GBUTTON_END_Y]
-	jg .continue
+	jg .clicked_continue
+
+	mov eax, [.current_window]
+	call xwidget_remove_focus
 
 	mov eax, XWIDGET_BUTTON
 	mov ebx, [.tmp]
 	ret
 
-.continue:
+.clicked_textbox:
+	mov [.tmp], esi
+
+	mov cx, [.x]	; mouse pos
+	mov dx, [.y]
+
+	cmp cx, [esi+XWIDGET_TEXTBOX_X]
+	jl .clicked_continue
+
+	cmp dx, [esi+XWIDGET_TEXTBOX_Y]
+	jl .clicked_continue
+
+	mov ax, [esi+XWIDGET_TEXTBOX_WIDTH]
+	add ax, [esi+XWIDGET_TEXTBOX_X]
+
+	mov bx, [esi+XWIDGET_TEXTBOX_HEIGHT]
+	add bx, [esi+XWIDGET_TEXTBOX_Y]
+
+	cmp cx, ax
+	jg .clicked_continue
+
+	cmp dx, bx
+	jg .clicked_continue
+
+	; give the textbox focus
+	or byte[esi+XWIDGET_TEXTBOX_FLAGS], XWIDGET_TEXTBOX_FOCUSED
+
+	mov eax, [.current_window]
+	call xwidget_redraw	; redraw to "show" the focus
+
+	jmp .clicked_continue
+
+.clicked_continue:
 	mov esi, [.tmp]
 	add esi, 256
-	jmp .loop
+	jmp .clicked_loop
 
 .lost_focus:
+	mov eax, [.current_window]
+	call xwidget_remove_focus
+
 	mov eax, XWIDGET_LOST_FOCUS
 	mov ebx, [.current_window]
 	ret
+
+.keypress:
+	mov ebp, XOS_READ_KEY
+	int 0x60
+
+	; ah = scancode, al = character
+	mov [.char], al
+
+	mov eax, [.current_window]
+	call xwidget_get_focused_textbox
+	cmp eax, -1
+	je .start
+
+	mov [.textbox_handle], eax
+
+	cmp [.char], 0		; unprintable character?
+	je .start
+	;je .textbox_check_arrows	; TO-DO!
+
+	cmp [.char], 8		; backspace?
+	je .textbox_backspace
+
+	cmp [.char], 13		; enter?
+	je .textbox_enter
+
+	mov eax, [.textbox_handle]
+	mov esi, [eax+XWIDGET_TEXTBOX_TEXT_POSITION]
+	inc dword[eax+XWIDGET_TEXTBOX_TEXT_POSITION]
+
+	add word[eax+XWIDGET_TEXTBOX_POSITION_X], 8
+
+	mov al, [.char]
+	call xwidget_insert_char
+
+	mov eax, [.current_window]
+	call xwidget_redraw
+	jmp .start
+
+.textbox_backspace:
+	mov eax, [.textbox_handle]
+	mov esi, [eax+XWIDGET_TEXTBOX_TEXT_POSITION]
+	cmp esi, [eax+XWIDGET_TEXTBOX_TEXT]
+	je .start
+
+	dec esi
+	dec dword[eax+XWIDGET_TEXTBOX_TEXT_POSITION]
+	call xwidget_delete_char
+	cmp al, 10	; did we delete a new line?
+	je .textbox_deleted_newline
+
+	mov eax, [.textbox_handle]
+	sub word[eax+XWIDGET_TEXTBOX_POSITION_X], 8
+
+	mov eax, [.current_window]
+	call xwidget_redraw
+	jmp .start
+
+.textbox_deleted_newline:
+	mov eax, [.textbox_handle]
+	sub word[eax+XWIDGET_TEXTBOX_POSITION_Y], 16
+
+	movzx eax, word[eax+XWIDGET_TEXTBOX_POSITION_Y]
+	shr eax, 4	; div 16
+	mov ebx, [.textbox_handle]
+	call xwidget_get_textbox_line
+
+	shl eax, 3	; mul 8
+
+	mov edi, [.textbox_handle]
+	mov word[edi+XWIDGET_TEXTBOX_POSITION_X], ax
+
+	mov eax, [.current_window]
+	call xwidget_redraw
+	jmp .start
+
+.textbox_enter:
+	mov eax, [.textbox_handle]
+	test byte[eax+XWIDGET_TEXTBOX_FLAGS], XWIDGET_TEXTBOX_MULTILINE	; are newlines allowed?
+	jz .start
+
+	mov esi, [eax+XWIDGET_TEXTBOX_TEXT_POSITION]
+	inc dword[eax+XWIDGET_TEXTBOX_TEXT_POSITION]
+
+	mov word[eax+XWIDGET_TEXTBOX_POSITION_X], 0
+	add word[eax+XWIDGET_TEXTBOX_POSITION_Y], 16
+
+	mov al, 10		; newline
+	call xwidget_insert_char
+
+	mov eax, [.current_window]
+	call xwidget_redraw
+	jmp .start
+
+.textbox_tab:
+	mov al, "	"
+	call xwidget_insert_char
+
+	mov eax, [.textbox_handle]
 
 align 4
 .current_window			dd 0
 .components			dd 0
 .components_end			dd 0
 .tmp				dd 0
+.textbox_handle			dd 0
 .x				dw 0
 .y				dw 0
 .button_x			dw 0
 .button_y			dw 0
 .button_end_x			dw 0 
 .button_end_y			dw 0
+.char				db 0
 
 
 
