@@ -5,7 +5,7 @@
 use16
 
 VBE_BUFFER_SIZE			= 0x1000000	; maximum buffer size is 16 MB
-VBE_PHYSICAL_BUFFER		= 0xDF000000
+VBE_PHYSICAL_BUFFER		= 0xD0000000
 VBE_BACK_BUFFER			= VBE_PHYSICAL_BUFFER + VBE_BUFFER_SIZE
 
 ; default width/height when EDID is unavailable or unusable

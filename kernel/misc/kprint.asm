@@ -138,8 +138,8 @@ com1_send_byte:
 com1_send:
 	pusha
 
-	cmp [com1_port], 0
-	je .done
+	;cmp [com1_port], 0
+	;je .done
 
 .loop:
 	lodsb
