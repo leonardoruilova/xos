@@ -27,10 +27,10 @@ all:
 	dd if=out/edit.exe conv=notrunc bs=512 seek=1082 of=disk.hdd
 
 run:
-	qemu-system-i386 -hda disk.hdd -m 128 -vga std -serial stdio -usb
+	qemu-system-i386 -drive file=disk.hdd,format=raw -m 128 -vga std -serial stdio -usb
 
 runsata:
-	qemu-system-i386 -m 128 -vga std -serial stdio -device ahci,id=ahci -drive if=none,file=disk.hdd,id=xosdrive -device ide-drive,drive=xosdrive,bus=ahci.0
+	qemu-system-i386 -m 128 -vga std -serial stdio -device ahci,id=ahci -drive if=none,file=disk.hdd,id=xosdrive,format=raw -device ide-drive,drive=xosdrive,bus=ahci.0
 
 runusb:
 	qemu-system-i386 -m 128 -vga std -serial stdio -usbdevice disk:disk.hdd

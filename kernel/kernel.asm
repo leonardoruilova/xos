@@ -7,7 +7,7 @@ org 0x1000
 
 	jmp 0x0000:kmain16
 
-	kernel_version			db "xOS32 v0.08 (2 February 2017)",0
+	kernel_version			db "xOS32 v0.08 (4 February 2017)",0
 	copyright_str			db "Copyright (C) 2016-2017 by Omar Mohammad.",0
 	newline				db 10,0
 
@@ -363,8 +363,8 @@ idle_process:
 
 	; Default bitmap font
 	font:
-	file "kernel/fonts/term.bin"
-	;file "kernel/fonts/alotware.bin"
+	;file "kernel/fonts/term.bin"
+	file "kernel/fonts/alotware.bin"
 	;file "kernel/fonts/cp437.bin"
 	;include "kernel/fonts/glaux-mono.asm"
 

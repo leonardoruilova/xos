@@ -384,5 +384,94 @@ align 4
 align 8
 .lba			dq 0
 
+; blkdev_write:
+; Writes to a block device
+; In\	EDX:EAX	= LBA sector
+; In\	ECX = Sector count
+; In\	EBX = Drive number
+; In\	ESI = Buffer to write sectors
+; Out\	AL = 0 on success, 1 on error
+; Out\	AH = Device status (for ATA and AHCI, at least)
+align 32
+blkdev_write:
+	mov [.count], ecx
+	mov [.buffer], esi
+	mov dword[.lba], eax
+	mov dword[.lba+4], edx
+
+	cmp ebx, [blkdevs]	; can't write to a non existant drive
+	jge .fail
+
+	shl ebx, 3
+	add ebx, [blkdev_structure]
+
+	; give control to device-specific code
+	;cmp byte[ebx], BLKDEV_MEMDISK
+	;je .memdisk
+
+	cmp byte[ebx], BLKDEV_ATA
+	je .ata
+
+	;cmp byte[ebx], BLKDEV_AHCI
+	;je .ahci
+
+	;cmp byte[ebx], BLKDEV_RAMDISK
+	;je .ramdisk
+
+	jmp .fail
+
+.ata:
+	mov bl, [ebx+BLKDEV_ADDRESS]
+	mov [.ata_drive], bl
+
+.ata_loop:
+	cmp [.count], 255
+	jg .ata_big
+
+	cmp [.count], 0
+	je .done
+
+	mov edx, dword[.lba+4]
+	mov eax, dword[.lba]
+	mov bl, [.ata_drive]
+	mov ecx, [.count]
+	mov esi, [.buffer]
+	call ata_write
+	cmp al, 1
+	je .fail
+
+	jmp .done
+
+.ata_big:
+	mov edx, dword[.lba+4]
+	mov eax, dword[.lba]
+	mov bl, [.ata_drive]
+	mov ecx, 255
+	mov esi, [.buffer]
+	call ata_write
+	cmp al, 1
+	je .fail
+
+	sub [.count], 255
+	add [.buffer], 255*512
+	add dword[.lba], 255
+	jmp .ata_loop
+
+.done:
+	mov al, 0
+	ret
+
+.fail:
+	mov al, 1
+	mov ah, -1
+	ret
+
+.ata_drive		db 0
+.ahci_port		db 0
+align 4
+.buffer			dd 0
+.count			dd 0
+align 8
+.lba			dq 0
 
 
