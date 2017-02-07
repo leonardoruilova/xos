@@ -22,14 +22,35 @@ El codigo del Sistema Operativo xOS se encuentra en etapas tempranas de desarrol
 * Una memoria RAM de 32 MB.
 * Pocos megabytes de espacio en su disco duro.
 
-For building requirements, you'll need [Flat Assembler](http://flatassembler.net) in your `$PATH`. Then, run `make` and it will build xOS. Feel free to tweak with xOS as you like, just please give me feedback. To clean up the working directory afterwards, run `make clean`.
+Para compilar el codigo fuente de xOS sera necesario utilizar el [Flat Assembler](http://flatassembler.net) en su `$PATH`. 
+Posteriormente, ejecute `make` para compilar el codigo fuente de xOS. 
 
-##Testing xOS
-xOS is provided as a disk image. `disk.hdd` in this repository can be considered the latest nightly build. It is very likely unstable and may crash. Old demo releases are in the "releases" tab. `disk.hdd` is a prebuilt hard disk image that can be used with QEMU or VirtualBox, though it performs best on VirtualBox. If you're tweaking the source and want to build xOS, simply run `make` as said above. To run xOS under QEMU, then `make run`. The Makefile assumes FASM and QEMU are both in your `$PATH`.  
-If you want to test xOS on real hardware without dumping the hard disk, use [SYSLINUX MEMDISK](http://www.syslinux.org/wiki/index.php?title=Download) and GRUB or another bootloader to boot xOS from a USB stick, or a hard disk. Use `disk.hdd` as the INITRD of MEMDISK. Any changes made within xOS will then be removed after system reset. xOS has been tested with SYSLINUX 4.07, but should work with other versions too.
+Sientase con todo el derecho de personalizar xOS a su gusto, tan solo entregueme retroalimentacion. 
+
+Para limpiar el working directory afterwards, ejecute `make clean`.
+
+##Pruebas de xOS
+Ud. podra usar xOS como imagen de disco. El archivo`disk.hdd`en este repositorio puede ser considerado la ultima nightly build. Sin duda sera inestable y podria fallar. 
+
+Es posible usar versiones de demostracion antigua en la pestana "releases". 
+
+El archivo `disk.hdd` consite en una imagen de disco previamente compilada, lista para ser su uso mediante QEMU o VirtualBox, si bien el mejor rendimiento se da en VirtualBox. 
+
+En caso que ud. este personalizando el codigo fuente y desee compilar el codigo de xOS, tan solo ejecute `make` como hemos mencionado anteriormente. 
+
+Para ejecutar xOS virtualizado bajo QEMU, ejecute `make run`. El archivo de compilacion Makefile asumes que tanto FASM como QEMU se encuntran en `$PATH`.  
+
+Si ud desea probar xOS en un computador without dumping the hard disk, use [SYSLINUX MEMDISK](http://www.syslinux.org/wiki/index.php?title=Download) y GRUB u otro bootloader para iniciar xOS desde una memoria USB o desde un disco duro. 
+
+Por favor, utilice el archivo `disk.hdd` como el INITRD de MEMDISK. 
+
+Todos los cambios realizados dentro de xOS seran deshechos una vez reinicie el sistema. 
+
+El Sistema Operativo xOS ha sido probado con SYSLINUX 4.07, pero debiera funcionar con otras versiones.
 
 ##Contact
-I can be contacted at omarx024@gmail.com. I am also user **omarrx024** on the OSDev Forum.
+El autor puede ser contactado en el correo omarx024@gmail.com. 
+En el foro OSDev, el autor usa la cuenta **omarrx024**.
 
 ##Spanish translation
 Esta traduccion ha sido liberada a los Comunes por Virgilio Leonardo Ruilova, bajo la licencia Creative Commons CC-BY-NC-SA.
