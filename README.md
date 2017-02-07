@@ -16,11 +16,11 @@ El codigo del Sistema Operativo xOS se encuentra en etapas tempranas de desarrol
 * Uso de teclados y mouse PS/2.
 * Interfaz grafica en color verdadero mediante ventanas.
 
-##Requirements
-* A Pentium CPU with SSE2, or better.
-* VESA 2.0-compatible BIOS, capable of true-color.
-* Little over 32 MB of RAM.
-* Few megabytes of disk space.
+##Requisitos
+* Un CPU Pentium con SSE2, cuanto menos.
+* Una BIOS de estandares VESA 2.0 o compatibles, con Color Verdadero.
+* Una memoria RAM de 32 MB.
+* Pocos megabytes de espacio en su disco duro.
 
 For building requirements, you'll need [Flat Assembler](http://flatassembler.net) in your `$PATH`. Then, run `make` and it will build xOS. Feel free to tweak with xOS as you like, just please give me feedback. To clean up the working directory afterwards, run `make clean`.
 
