@@ -1,7 +1,13 @@
 ![](https://s28.postimg.org/kgj29w77x/main_interface.png)
 ![](https://s23.postimg.org/j38d5uf2z/collage.jpg)
-xOS is a 32-bit graphical operating system written for the PC entirely in assembly language. This results in faster execution, smaller program sizes and overall simplicity. The goal of xOS is to be fully functional, yet small and simple.
-##Features
+El Sistema Operativo xOS fue programado para CPU de 32-bit y usa interfaz grafica. Fue programado completamente en lenguaje de bajo nivel para PC. 
+
+El uso de lenguaje de bajo nivel otorga mayor velocidad, menor consumo de memoria y una simplicidad generalizada. 
+
+La meta de este proyecto es concebir un Sistema Operativo funcional, diminuto y sencillo.
+
+
+##Cualidades
 xOS is still under early stages of development; although the following features are already implemented:
 * PCI and ACPI, with shutdown.
 * ATA and SATA hard disks.
@@ -24,3 +30,5 @@ If you want to test xOS on real hardware without dumping the hard disk, use [SYS
 ##Contact
 I can be contacted at omarx024@gmail.com. I am also user **omarrx024** on the OSDev Forum.
 
+##Spanish translation
+Esta traduccion ha sido liberada a los Comunes por Virgilio Leonardo Ruilova, bajo la licencia Creative Commons CC-BY-NC-SA.
