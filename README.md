@@ -8,12 +8,13 @@ La meta de este proyecto es concebir un Sistema Operativo funcional, diminuto y 
 
 
 ##Cualidades
-xOS is still under early stages of development; although the following features are already implemented:
-* PCI and ACPI, with shutdown.
-* ATA and SATA hard disks.
-* Multitasking and userspace.
-* PS/2 keyboard and mouse.
-* True-color windowed graphical user interface.
+El codigo del Sistema Operativo xOS se encuentra en etapas tempranas de desarrollo, sin embargo hemos logrado las siguientes funcionalidades:
+* Gestion de energia mediante PCI y ACPI, con apagado.
+* Disponibilidad de discos duros ATA y Serial ATA.
+* Multitarea 
+* Software en espacio de usuario.
+* Uso de teclados y mouse PS/2.
+* Interfaz grafica en color verdadero mediante ventanas.
 
 ##Requirements
 * A Pentium CPU with SSE2, or better.
