@@ -7,7 +7,7 @@ El uso de lenguaje de bajo nivel otorga mayor velocidad, menor consumo de memori
 La meta de este proyecto es concebir un Sistema Operativo funcional, diminuto y sencillo.
 
 
-##Cualidades
+## Cualidades
 El codigo del Sistema Operativo xOS se encuentra en etapas tempranas de desarrollo, sin embargo hemos logrado las siguientes funcionalidades:
 * Gestion de energia mediante PCI y ACPI, con apagado.
 * Disponibilidad de discos duros ATA y Serial ATA.
@@ -16,7 +16,7 @@ El codigo del Sistema Operativo xOS se encuentra en etapas tempranas de desarrol
 * Uso de teclados y mouse PS/2.
 * Interfaz grafica en color verdadero mediante ventanas.
 
-##Requisitos
+## Requisitos
 * Un CPU Pentium con SSE2, cuanto menos.
 * Una BIOS de estandares VESA 2.0 o compatibles, con Color Verdadero.
 * Una memoria RAM de 32 MB.
@@ -29,7 +29,7 @@ Sientase con todo el derecho de personalizar xOS a su gusto, tan solo entregueme
 
 Para limpiar el working directory afterwards, ejecute `make clean`.
 
-##Pruebas de xOS
+## Pruebas de xOS
 Ud. podra usar xOS como imagen de disco. El archivo`disk.hdd`en este repositorio puede ser considerado la ultima nightly build. Sin duda sera inestable y podria fallar. 
 
 Es posible usar versiones de demostracion antigua en la pestana "releases". 
@@ -48,9 +48,9 @@ Todos los cambios realizados dentro de xOS seran deshechos una vez reinicie el s
 
 El Sistema Operativo xOS ha sido probado con SYSLINUX 4.07, pero debiera funcionar con otras versiones.
 
-##Contact
+## Contact
 El autor puede ser contactado en el correo omarx024@gmail.com. 
 En el foro OSDev, el autor usa la cuenta **omarrx024**.
 
-##Spanish translation
+## Spanish translation
 Esta traduccion ha sido liberada a los Comunes por Virgilio Leonardo Ruilova, bajo la licencia Creative Commons CC-BY-NC-SA.
